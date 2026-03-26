@@ -41,6 +41,11 @@ export default function MembersPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [hostMessage, setHostMessage] = useState("");
+  const [hostMobilePhone, setHostMobilePhone] = useState("");
+  const [hostAddress, setHostAddress] = useState("");
+  const [cutlery, setCutlery] = useState(false);
+  const [glassware, setGlassware] = useState(false);
+  const [crockery, setCrockery] = useState(false);
 
   const loadSummary = useCallback(async () => {
     setLoadError(null);
@@ -141,11 +146,23 @@ export default function MembersPage() {
     try {
       const res = await fetchAuthed(netlifyFunctionUrl("request-host"), {
         method: "POST",
-        body: JSON.stringify({ message: hostMessage }),
+        body: JSON.stringify({
+          message: hostMessage,
+          mobilePhone: hostMobilePhone,
+          address: hostAddress,
+          cutlery,
+          glassware,
+          crockery,
+        }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Request failed");
       setHostMessage("");
+      setHostMobilePhone("");
+      setHostAddress("");
+      setCutlery(false);
+      setGlassware(false);
+      setCrockery(false);
       await loadSummary();
     } catch (e) {
       setActionError(e instanceof Error ? e.message : "Something went wrong.");
@@ -272,6 +289,66 @@ export default function MembersPage() {
               <p className="mt-2 font-geist text-body-sm text-foreground/70">
                 Ask the club admins to approve you as a host. If accepted, you&apos;ll see meal management below.
               </p>
+              <div className="mt-6 space-y-4">
+                <div>
+                  <label className="mb-1 block font-geist text-body-sm text-foreground/80">
+                    Mobile phone number
+                  </label>
+                  <input
+                    type="tel"
+                    value={hostMobilePhone}
+                    onChange={(e) => setHostMobilePhone(e.target.value)}
+                    disabled={summary.pendingHostRequest || busy}
+                    placeholder="(optional)"
+                    className="w-full rounded border border-white/20 bg-transparent px-4 py-3 font-geist text-foreground placeholder:text-foreground/40 focus:border-brass focus:outline-none disabled:opacity-50"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block font-geist text-body-sm text-foreground/80">
+                    Address (street, city, ZIP)
+                  </label>
+                  <textarea
+                    value={hostAddress}
+                    onChange={(e) => setHostAddress(e.target.value)}
+                    rows={3}
+                    disabled={summary.pendingHostRequest || busy}
+                    placeholder="Full address"
+                    className="mt-0 w-full resize-none rounded border border-white/20 bg-transparent px-4 py-3 font-geist text-foreground placeholder:text-foreground/40 focus:border-brass focus:outline-none disabled:opacity-50"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="inline-flex items-center gap-3 font-geist text-body-sm text-foreground/70">
+                    <input
+                      type="checkbox"
+                      checked={cutlery}
+                      onChange={(e) => setCutlery(e.target.checked)}
+                      disabled={summary.pendingHostRequest || busy}
+                    />
+                    Cutlery
+                  </label>
+                  <label className="inline-flex items-center gap-3 font-geist text-body-sm text-foreground/70">
+                    <input
+                      type="checkbox"
+                      checked={glassware}
+                      onChange={(e) => setGlassware(e.target.checked)}
+                      disabled={summary.pendingHostRequest || busy}
+                    />
+                    Glassware
+                  </label>
+                  <label className="inline-flex items-center gap-3 font-geist text-body-sm text-foreground/70">
+                    <input
+                      type="checkbox"
+                      checked={crockery}
+                      onChange={(e) => setCrockery(e.target.checked)}
+                      disabled={summary.pendingHostRequest || busy}
+                    />
+                    Crockery
+                  </label>
+                </div>
+              </div>
+
               <textarea
                 value={hostMessage}
                 onChange={(e) => setHostMessage(e.target.value)}
@@ -282,7 +359,7 @@ export default function MembersPage() {
               />
               <button
                 type="button"
-                disabled={summary.pendingHostRequest || busy}
+                disabled={summary.pendingHostRequest || busy || !hostAddress.trim()}
                 onClick={() => void requestHost()}
                 className="mt-4 rounded border border-foreground/60 px-5 py-2.5 font-geist text-body-sm text-foreground transition-colors hover:border-foreground hover:bg-foreground hover:text-background disabled:cursor-not-allowed disabled:opacity-40"
               >

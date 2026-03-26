@@ -14,7 +14,7 @@ A static website for SDSupperClub — a private, invite-only dining club in San 
 
    Copy `.env.local.example` to `.env.local`. See comments there for:
 
-   - Web3Forms (optional invite form)
+   - Invitation request form (direct POST + hCaptcha)
    - `NEXT_PUBLIC_NETLIFY_IDENTITY_URL` — only if you run the frontend outside Netlify (see below)
    - `NETLIFY_DATABASE_URL` — optional for local-only testing; `npx netlify dev` injects it when Netlify DB is linked
 
@@ -73,7 +73,7 @@ Do these after Neon / Netlify DB is created for the site (code already expects `
 3. **Apply schema:** Run [`netlify/db/schema.sql`](netlify/db/schema.sql) in Neon’s SQL editor, or locally `npm run db:apply-schema` with `NETLIFY_DATABASE_URL` set. If the DB already existed, run [`netlify/db/migration_content.sql`](netlify/db/migration_content.sql) once, then optional [`netlify/db/seed-content.sql`](netlify/db/seed-content.sql).
 4. **Claim Neon** (long-term): **Extensions → Neon → Connect / Claim** so the instance is not removed after the unclaimed trial period ([docs](https://docs.netlify.com/netlify-db/)).
 5. **Trace “signup” issues:** There are two paths:
-  - **Marketing “request invite” form** ([`components/ui/InviteForm.tsx`](components/ui/InviteForm.tsx)): uses **Web3Forms** + hCaptcha and **`NEXT_PUBLIC_WEB3FORMS_KEY`** only — not Netlify DB. If the key is missing, the UI now explains that. hCaptcha requires enabling the hCaptcha block option in your Web3Forms dashboard.
+  - **Marketing “request invite” form** ([`components/ui/InviteForm.tsx`](components/ui/InviteForm.tsx)): POSTs to `/.netlify/functions/submit-invite-request` and verifies hCaptcha server-side. If it fails, check Netlify → Functions → `submit-invite-request` logs for missing `HCAPTCHA_SECRET` / `RESEND_API_KEY` / `ADMIN_NOTIFICATION_EMAIL`.
    - **Member account (Identity invite accepted):** Netlify Identity calls **`identity-signup`** → writes to **`users`**. If that fails, open **Netlify → Functions → `identity-signup` → Logs** (typical causes: missing `NETLIFY_DATABASE_URL`, or schema not applied → `relation "users" does not exist`).
 
 ## Admin notification email (secure setup)
@@ -153,7 +153,7 @@ Never commit these to the repo or put them in `.env.local` if that file might be
 ## Features
 
 - **Marketing pages** — copy and upcoming fallback from Neon (`get-site-content`) with [`lib/default-site-content.ts`](lib/default-site-content.ts) as offline fallback; past menus from `get-past-meals`.
-- **Invitation form** — Web3Forms (or swap to Netlify Forms).
+- **Invitation form** — direct POST to a Netlify Function + hCaptcha.
 - **Members** — Netlify Identity + Netlify DB–backed dashboard.
 
 ## Adding a hero image

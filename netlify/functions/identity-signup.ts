@@ -1,5 +1,5 @@
 import type { Handler } from "@netlify/functions";
-import { sql } from "./lib/db";
+import { getOrCreateAppUser } from "./lib/auth";
 
 /**
  * Netlify Identity trigger: runs when a user signs up (invite accepted).
@@ -21,16 +21,11 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    const name =
-      user.user_metadata?.full_name ?? user.user_metadata?.name ?? null;
-
-    await sql`
-      INSERT INTO users (netlify_identity_id, email, name)
-      VALUES (${user.id}, ${user.email}, ${name})
-      ON CONFLICT (netlify_identity_id) DO UPDATE SET
-        email = EXCLUDED.email,
-        name = EXCLUDED.name
-    `;
+    await getOrCreateAppUser({
+      sub: user.id,
+      email: user.email,
+      user_metadata: user.user_metadata,
+    });
 
     return {
       statusCode: 200,

@@ -47,11 +47,34 @@ export const handler: Handler = async (event, context) => {
     const body = JSON.parse(event.body || "{}");
     const message = (body.message as string | undefined) ?? "";
 
+    const address = (body.address as string | undefined) ?? "";
+    const mobilePhone = (body.mobilePhone as string | undefined) ?? "";
+    const cutlery = Boolean(body.cutlery);
+    const glassware = Boolean(body.glassware);
+    const crockery = Boolean(body.crockery);
+
+    if (!address.trim()) {
+      return { statusCode: 400, headers: jsonHeaders, body: JSON.stringify({ error: "address required" }) };
+    }
+
+    const fullName =
+      (netlifyUser.user_metadata?.full_name as string | undefined) ??
+      (netlifyUser.user_metadata?.name as string | undefined) ??
+      null;
+    const parts = fullName
+      ? fullName
+          .split(" ")
+          .map((p) => p.trim())
+          .filter(Boolean)
+      : [];
+    const firstName = parts[0] ?? null;
+    const surname = parts.length > 1 ? parts.slice(1).join(" ") : null;
+
     const appUser = await getOrCreateAppUser(netlifyUser);
 
     const pendingRows = await sql`
-      SELECT id FROM host_requests
-      WHERE user_id = ${appUser.id} AND status = 'pending'
+      SELECT id FROM hosts
+      WHERE member_id = ${appUser.id} AND approval_status = 'pending'
       LIMIT 1
     `;
 
@@ -64,13 +87,61 @@ export const handler: Handler = async (event, context) => {
     }
 
     await sql`
-      INSERT INTO host_requests (user_id, message, status)
-      VALUES (${appUser.id}, ${message || null}, 'pending')
+      INSERT INTO hosts (
+        member_id,
+        first_name,
+        surname,
+        email,
+        mobile_phone,
+        address,
+        cutlery,
+        glassware,
+        crockery,
+        approval_status,
+        approval_note
+      )
+      VALUES (
+        ${appUser.id},
+        ${firstName},
+        ${surname},
+        ${netlifyUser.email ?? null},
+        ${mobilePhone || null},
+        ${address},
+        ${cutlery},
+        ${glassware},
+        ${crockery},
+        'pending',
+        ${message || null}
+      )
+      ON CONFLICT (member_id) DO UPDATE SET
+        address = EXCLUDED.address,
+        mobile_phone = EXCLUDED.mobile_phone,
+        cutlery = EXCLUDED.cutlery,
+        glassware = EXCLUDED.glassware,
+        crockery = EXCLUDED.crockery,
+        approval_note = EXCLUDED.approval_note,
+        approval_status = CASE
+          WHEN hosts.approval_status = 'approved' THEN 'approved'
+          ELSE 'pending'
+        END
     `;
 
     await notifyAdminEmail(
       "SDSupperClub — request to host",
-      `A member requested to host.\n\nUser id (app): ${appUser.id}\nNetlify id: ${netlifyUser.sub}\nEmail: ${netlifyUser.email ?? "unknown"}\n\nMessage:\n${message || "(none)"}`,
+      [
+        "A member requested to host.",
+        "",
+        `Member id (app): ${appUser.id}`,
+        `Netlify id: ${netlifyUser.sub}`,
+        `Email: ${netlifyUser.email ?? "unknown"}`,
+        "",
+        `Address:\n${address}`,
+        `Cutlery: ${cutlery}`,
+        `Glassware: ${glassware}`,
+        `Crockery: ${crockery}`,
+        "",
+        `Message:\n${message || "(none)"}`,
+      ].join("\n"),
     );
 
     return { statusCode: 200, headers: jsonHeaders, body: JSON.stringify({ ok: true }) };

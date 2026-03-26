@@ -10,7 +10,7 @@ export const handler: Handler = async (event) => {
 
   try {
     const meals = await sql`
-      SELECT * FROM meals
+      SELECT * FROM dinners
       WHERE is_visible = true AND status IN ('live', 'upcoming', 'full')
       ORDER BY
         CASE status WHEN 'live' THEN 0 WHEN 'full' THEN 1 ELSE 2 END,
@@ -24,8 +24,8 @@ export const handler: Handler = async (event) => {
     }
 
     const countRows = await sql`
-      SELECT count(*)::int AS c FROM attendances
-      WHERE meal_id = ${meal.id as string} AND status IN ('paid', 'confirmed')
+      SELECT count(*)::int AS c FROM dinner_guests
+      WHERE dinner_id = ${meal.id as string} AND status IN ('paid', 'confirmed')
     `;
     const confirmedCount = (countRows[0] as { c: number } | undefined)?.c ?? 0;
     const maxSeats = meal.max_seats as number;

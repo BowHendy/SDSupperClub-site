@@ -28,7 +28,7 @@ export const handler: Handler = async (event, context) => {
     const appUser = await getOrCreateAppUser(netlifyUser);
 
     const meals = await sql`
-      SELECT * FROM meals
+      SELECT * FROM dinners
       WHERE is_visible = true AND status IN ('live', 'upcoming', 'full')
     `;
 
@@ -40,15 +40,15 @@ export const handler: Handler = async (event, context) => {
     if (meal) {
       const mealId = meal.id as string;
       const attRows = await sql`
-        SELECT * FROM attendances
-        WHERE user_id = ${appUser.id} AND meal_id = ${mealId}
+        SELECT * FROM dinner_guests
+        WHERE member_id = ${appUser.id} AND dinner_id = ${mealId}
         LIMIT 1
       `;
       attendance = (attRows[0] as Record<string, unknown>) ?? null;
 
       const countRows = await sql`
-        SELECT count(*)::int AS c FROM attendances
-        WHERE meal_id = ${mealId} AND status IN ('paid', 'confirmed')
+        SELECT count(*)::int AS c FROM dinner_guests
+        WHERE dinner_id = ${mealId} AND status IN ('paid', 'confirmed')
       `;
       confirmedCount = (countRows[0] as { c: number } | undefined)?.c ?? 0;
       const maxSeats = meal.max_seats as number;
@@ -56,11 +56,18 @@ export const handler: Handler = async (event, context) => {
     }
 
     const pendingRows = await sql`
-      SELECT id, status FROM host_requests
-      WHERE user_id = ${appUser.id} AND status = 'pending'
+      SELECT id, approval_status FROM hosts
+      WHERE member_id = ${appUser.id} AND approval_status = 'pending'
       LIMIT 1
     `;
     const pendingHost = pendingRows[0];
+
+    const approvedRows = await sql`
+      SELECT id FROM hosts
+      WHERE member_id = ${appUser.id} AND approval_status = 'approved'
+      LIMIT 1
+    `;
+    const approvedHost = approvedRows[0];
 
     return {
       statusCode: 200,
@@ -71,7 +78,7 @@ export const handler: Handler = async (event, context) => {
         confirmedCount,
         maxSeats: meal ? (meal.max_seats as number) : null,
         isFull,
-        isHostApproved: appUser.is_host_approved,
+        isHostApproved: Boolean(approvedHost),
         pendingHostRequest: Boolean(pendingHost),
       }),
     };

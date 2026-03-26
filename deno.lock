@@ -11,13 +11,14 @@
   "workspace": {
     "packageJson": {
       "dependencies": [
+        "npm:@hcaptcha/react-hcaptcha@^2.0.2",
         "npm:@netlify/functions@^5.1.5",
         "npm:@netlify/neon@~0.1.2",
-        "npm:@sanity/client@^7.17.0",
         "npm:@types/netlify-identity-widget@^1.9.7",
         "npm:@types/node@20",
         "npm:@types/react-dom@18",
         "npm:@types/react@18",
+        "npm:dotenv@^17.3.1",
         "npm:eslint-config-next@^16.1.7",
         "npm:eslint@9",
         "npm:framer-motion@^12.35.2",
@@ -25,6 +26,7 @@
         "npm:netlify-identity-widget@^2.0.3",
         "npm:next@^16.1.7",
         "npm:postcss@8",
+        "npm:postgres@^3.4.8",
         "npm:react-dom@18",
         "npm:react-hook-form@^7.71.2",
         "npm:react@18",

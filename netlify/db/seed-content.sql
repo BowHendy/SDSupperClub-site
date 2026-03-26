@@ -1,7 +1,7 @@
 -- Idempotent seed: past menus + site JSON (matches former lib/mock-data defaults).
 -- Run in Neon after schema.sql / migration_content.sql.
 
-insert into public.meals (
+insert into public.dinners (
   id,
   month,
   year,

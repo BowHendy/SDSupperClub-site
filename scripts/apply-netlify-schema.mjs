@@ -29,6 +29,8 @@ const sql = postgres(url, { max: 1 });
 try {
   await sql.unsafe(ddl);
   console.log("Applied:", schemaPath);
+} catch (e) {
+  throw e;
 } finally {
   await sql.end({ timeout: 5 });
 }

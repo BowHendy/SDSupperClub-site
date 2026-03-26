@@ -27,13 +27,13 @@ export const handler: Handler = async (event, context) => {
     const appUser = await getOrCreateAppUser(netlifyUser);
 
     await sql`
-      INSERT INTO attendances (user_id, meal_id, status)
-      VALUES (${appUser.id}, ${mealId}, 'paid')
-      ON CONFLICT (user_id, meal_id) DO UPDATE SET status = EXCLUDED.status
+      INSERT INTO dinner_guests (dinner_id, member_id, status)
+      VALUES (${mealId}, ${appUser.id}, 'paid')
+      ON CONFLICT (dinner_id, member_id) DO UPDATE SET status = EXCLUDED.status
     `;
 
     const mealRows = await sql`
-      SELECT id, max_seats, status FROM meals WHERE id = ${mealId} LIMIT 1
+      SELECT id, max_seats, status FROM dinners WHERE id = ${mealId} LIMIT 1
     `;
     const meal = mealRows[0] as { id: string; max_seats: number; status: string } | undefined;
 
@@ -42,24 +42,24 @@ export const handler: Handler = async (event, context) => {
     }
 
     const countRows = await sql`
-      SELECT count(*)::int AS c FROM attendances
-      WHERE meal_id = ${mealId} AND status IN ('paid', 'confirmed')
+      SELECT count(*)::int AS c FROM dinner_guests
+      WHERE dinner_id = ${mealId} AND status IN ('paid', 'confirmed')
     `;
     const paidCount = (countRows[0] as { c: number } | undefined)?.c ?? 0;
     const maxSeats = meal.max_seats;
 
     if (paidCount >= maxSeats && meal.status === "live") {
-      await sql`UPDATE meals SET status = 'full' WHERE id = ${mealId}`;
+      await sql`UPDATE dinners SET status = 'full' WHERE id = ${mealId}`;
 
       const nextRows = await sql`
-        SELECT id FROM meals
+        SELECT id FROM dinners
         WHERE status = 'upcoming' AND is_visible = true
         ORDER BY created_at ASC
         LIMIT 1
       `;
       const nextId = (nextRows[0] as { id: string } | undefined)?.id;
       if (nextId) {
-        await sql`UPDATE meals SET status = 'live' WHERE id = ${nextId}`;
+        await sql`UPDATE dinners SET status = 'live' WHERE id = ${nextId}`;
       }
     }
 

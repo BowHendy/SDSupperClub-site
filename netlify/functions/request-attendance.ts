@@ -22,9 +22,12 @@ export const handler: Handler = async (event, context) => {
     }
 
     const appUser = await getOrCreateAppUser(netlifyUser);
+    if (!appUser.is_member_approved) {
+      return { statusCode: 403, headers: jsonHeaders, body: JSON.stringify({ error: "Member is not approved yet" }) };
+    }
 
     const mealRows = await sql`
-      SELECT id, status, max_seats FROM meals WHERE id = ${mealId} LIMIT 1
+      SELECT id, status, max_seats FROM dinners WHERE id = ${mealId} LIMIT 1
     `;
     const meal = mealRows[0] as { id: string; status: string; max_seats: number } | undefined;
 
@@ -41,8 +44,8 @@ export const handler: Handler = async (event, context) => {
     }
 
     const countRows = await sql`
-      SELECT count(*)::int AS c FROM attendances
-      WHERE meal_id = ${mealId} AND status IN ('paid', 'confirmed')
+      SELECT count(*)::int AS c FROM dinner_guests
+      WHERE dinner_id = ${mealId} AND status IN ('paid', 'confirmed')
     `;
     const taken = (countRows[0] as { c: number } | undefined)?.c ?? 0;
     if (taken >= meal.max_seats) {
@@ -50,9 +53,9 @@ export const handler: Handler = async (event, context) => {
     }
 
     await sql`
-      INSERT INTO attendances (user_id, meal_id, status)
-      VALUES (${appUser.id}, ${mealId}, 'waitlisted')
-      ON CONFLICT (user_id, meal_id) DO UPDATE SET status = EXCLUDED.status
+      INSERT INTO dinner_guests (dinner_id, member_id, status)
+      VALUES (${mealId}, ${appUser.id}, 'waitlisted')
+      ON CONFLICT (dinner_id, member_id) DO UPDATE SET status = EXCLUDED.status
     `;
 
     return { statusCode: 200, headers: jsonHeaders, body: JSON.stringify({ ok: true }) };

@@ -23,7 +23,7 @@ export const handler: Handler = async (event) => {
   try {
     const rows = (await sql`
       SELECT id, month, year, neighborhood, chef_name, menu_line, title, image_url, image_url_2
-      FROM meals
+      FROM dinners
       WHERE status = 'past' AND is_visible = true
       ORDER BY display_date DESC NULLS LAST, year DESC, created_at DESC
     `) as MealRow[];
