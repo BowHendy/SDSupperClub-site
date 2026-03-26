@@ -1,7 +1,8 @@
 "use client";
 
 import { useForm } from "react-hook-form";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import HCaptcha from "@hcaptcha/react-hcaptcha";
 import { Button } from "./Button";
 
 type InviteFormData = {
@@ -9,13 +10,21 @@ type InviteFormData = {
   email: string;
   referredBy: string;
   why: string;
+  "h-captcha-response": string;
 };
 
 export function InviteForm() {
   const [status, setStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
+  const [errorReason, setErrorReason] = useState<
+    "missing_web3forms" | "captcha_missing" | "submit_failed" | null
+  >(null);
+  const captchaRef = useRef<HCaptcha | null>(null);
+  const captchaSiteKey =
+    process.env.NEXT_PUBLIC_WEB3FORMS_HCAPTCHA_SITEKEY ?? "50b2fe65-b00b-4b9e-ad62-3ba471098be2";
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
     reset,
   } = useForm<InviteFormData>();
@@ -23,9 +32,16 @@ export function InviteForm() {
   const onSubmit = async (data: InviteFormData) => {
     const key = process.env.NEXT_PUBLIC_WEB3FORMS_KEY;
     if (!key) {
+      setErrorReason("missing_web3forms");
       setStatus("error");
       return;
     }
+    if (!data["h-captcha-response"]) {
+      setErrorReason("captcha_missing");
+      setStatus("error");
+      return;
+    }
+    setErrorReason(null);
     setStatus("sending");
     try {
       const res = await fetch("https://api.web3forms.com/submit", {
@@ -37,6 +53,7 @@ export function InviteForm() {
           email: data.email,
           referred_by: data.referredBy,
           why: data.why,
+          "h-captcha-response": data["h-captcha-response"],
           subject: "SDSupperClub — Invitation Request",
         }),
       });
@@ -44,10 +61,13 @@ export function InviteForm() {
       if (json.success) {
         setStatus("success");
         reset();
+        captchaRef.current?.resetCaptcha();
       } else {
+        setErrorReason("submit_failed");
         setStatus("error");
       }
     } catch {
+      setErrorReason("submit_failed");
       setStatus("error");
     }
   };
@@ -122,9 +142,41 @@ export function InviteForm() {
           <p className="mt-1 text-body-sm text-terracotta">{errors.why.message}</p>
         )}
       </div>
-      {status === "error" && (
+      <input
+        type="hidden"
+        {...register("h-captcha-response", { required: "Please complete the captcha challenge." })}
+      />
+      <div className="overflow-x-auto">
+        <HCaptcha
+          ref={captchaRef}
+          sitekey={captchaSiteKey}
+          reCaptchaCompat={false}
+          onVerify={(token) => {
+            setValue("h-captcha-response", token, { shouldValidate: true });
+            setErrorReason(null);
+          }}
+          onExpire={() => {
+            setValue("h-captcha-response", "", { shouldValidate: true });
+          }}
+        />
+      </div>
+      {errors["h-captcha-response"] && (
+        <p className="text-body-sm text-terracotta">{errors["h-captcha-response"].message}</p>
+      )}
+      {status === "error" && errorReason === "missing_web3forms" && (
         <p className="text-body-sm text-terracotta">
-          Something went wrong. Please try again or email us directly.
+          This invite form is not configured on the server: set{" "}
+          <code className="text-foreground">NEXT_PUBLIC_WEB3FORMS_KEY</code> in{" "}
+          <strong>Netlify → Site configuration → Environment variables</strong> (build env), then redeploy. This form
+          does <strong>not</strong> use Netlify DB or Identity — it only posts to Web3Forms.
+        </p>
+      )}
+      {status === "error" && errorReason === "captcha_missing" && (
+        <p className="text-body-sm text-terracotta">Please complete the captcha challenge, then submit again.</p>
+      )}
+      {status === "error" && errorReason === "submit_failed" && (
+        <p className="text-body-sm text-terracotta">
+          Something went wrong sending your request. Check the Web3Forms key, network, or email us directly.
         </p>
       )}
       <Button type="submit" disabled={status === "sending"}>

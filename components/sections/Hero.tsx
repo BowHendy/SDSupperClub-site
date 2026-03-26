@@ -2,13 +2,11 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-
-const HERO_COPY = {
-  headline: "Ten seats. One chef. Someone's home. Once a month.",
-  cta: "Request an Invitation",
-};
+import { useSiteContent } from "@/components/providers/SiteContentProvider";
 
 export function Hero() {
+  const { site } = useSiteContent();
+  const hero = site.hero;
   return (
     <section className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-charcoal">
       {/* Full-bleed atmospheric background; add /public/images/hero.jpg for a custom image */}
@@ -24,7 +22,7 @@ export function Hero() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.9, ease: [0.4, 0, 0.2, 1] }}
         >
-          {HERO_COPY.headline}
+          {hero.headline}
         </motion.h1>
         <motion.div
           className="mt-10"
@@ -36,7 +34,7 @@ export function Hero() {
             href="/#request-invite"
             className="inline-block rounded border border-parchment/70 px-6 py-3 font-geist text-body-md text-parchment transition-all duration-300 hover:bg-parchment hover:text-charcoal"
           >
-            {HERO_COPY.cta}
+            {hero.cta}
           </Link>
         </motion.div>
       </div>

@@ -3,6 +3,7 @@ import { Cormorant_Garamond } from "next/font/google";
 import { GeistSans } from "geist/font/sans";
 import { CustomCursor } from "@/components/cursor/CustomCursor";
 import { Navigation } from "@/components/nav/Navigation";
+import { SiteContentProvider } from "@/components/providers/SiteContentProvider";
 import { ContactFooter } from "@/components/sections/ContactFooter";
 import "./globals.css";
 
@@ -32,10 +33,12 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${cormorant.variable} ${GeistSans.variable}`}>
       <body className="min-h-screen font-geist text-foreground antialiased">
-        <CustomCursor />
-        <Navigation />
-        <main>{children}</main>
-        <ContactFooter />
+        <SiteContentProvider>
+          <CustomCursor />
+          <Navigation />
+          <main>{children}</main>
+          <ContactFooter />
+        </SiteContentProvider>
       </body>
     </html>
   );

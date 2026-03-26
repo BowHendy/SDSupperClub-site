@@ -1,5 +1,7 @@
+"use client";
+
+import { useSiteContent } from "@/components/providers/SiteContentProvider";
 import { FadeIn } from "@/components/ui/FadeIn";
-import { BRAND } from "@/lib/mock-data";
 
 const ICONS: Record<string, string> = {
   frequency: "①",
@@ -9,6 +11,8 @@ const ICONS: Record<string, string> = {
 };
 
 export function Experience() {
+  const { site } = useSiteContent();
+  const b = site.experience;
   return (
     <section
       id="experience"
@@ -17,16 +21,16 @@ export function Experience() {
       <div className="mx-auto max-w-4xl px-6 md:px-8">
         <FadeIn>
           <h2 className="font-cormorant text-display-sm font-medium text-foreground">
-            {BRAND.experience.title}
+            {b.title}
           </h2>
         </FadeIn>
         <FadeIn delay={0.08}>
           <p className="mt-8 font-geist text-body-lg text-foreground/90 md:text-xl">
-            {BRAND.experience.lead}
+            {b.lead}
           </p>
         </FadeIn>
         <ul className="mt-14 grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
-          {BRAND.experience.items.map((item, i) => (
+          {b.items.map((item, i) => (
             <li key={item.key}>
               <FadeIn delay={0.12 + i * 0.08}>
                 <span className="font-cormorant text-2xl text-brass" aria-hidden>
@@ -39,11 +43,11 @@ export function Experience() {
         </ul>
         <FadeIn delay={0.2}>
           <p className="mt-14 font-cormorant text-2xl font-medium leading-snug text-foreground md:text-3xl">
-            {BRAND.experience.bridge}
+            {b.bridge}
           </p>
         </FadeIn>
         <div className="mt-14 space-y-8 border-t border-white/10 pt-14">
-          {BRAND.experience.paragraphs.map((paragraph, i) => (
+          {b.paragraphs.map((paragraph, i) => (
             <FadeIn key={i} delay={i * 0.1}>
               <p className="font-geist text-body-lg leading-relaxed text-foreground/90">
                 {paragraph}
