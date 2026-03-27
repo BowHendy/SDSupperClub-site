@@ -20,7 +20,9 @@ export function InviteForm() {
   >(null);
   const captchaRef = useRef<HCaptcha | null>(null);
   const captchaSiteKey =
-    process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY ?? "50b2fe65-b00b-4b9e-ad62-3ba471098be2";
+    process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY?.trim() ||
+    process.env.NEXT_PUBLIC_WEB3FORMS_HCAPTCHA_SITEKEY?.trim() ||
+    "50b2fe65-b00b-4b9e-ad62-3ba471098be2";
   const {
     register,
     handleSubmit,
