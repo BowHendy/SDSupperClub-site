@@ -1,8 +1,7 @@
 "use client";
 
 import { useForm } from "react-hook-form";
-import { useRef, useState } from "react";
-import HCaptcha from "@hcaptcha/react-hcaptcha";
+import { type BaseSyntheticEvent, useState } from "react";
 import { Button } from "./Button";
 
 type InviteFormData = {
@@ -10,52 +9,32 @@ type InviteFormData = {
   email: string;
   referredBy: string;
   why: string;
-  "h-captcha-response": string;
 };
 
 export function InviteForm() {
   const [status, setStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
-  const [errorReason, setErrorReason] = useState<
-    "captcha_missing" | "submit_failed" | null
-  >(null);
-  const captchaRef = useRef<HCaptcha | null>(null);
-  const captchaSiteKey =
-    process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY?.trim() ||
-    process.env.NEXT_PUBLIC_WEB3FORMS_HCAPTCHA_SITEKEY?.trim() ||
-    "50b2fe65-b00b-4b9e-ad62-3ba471098be2";
+  const [errorReason, setErrorReason] = useState<"submit_failed" | null>(null);
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors },
     reset,
   } = useForm<InviteFormData>();
 
-  const onSubmit = async (data: InviteFormData) => {
-    if (!data["h-captcha-response"]) {
-      setErrorReason("captcha_missing");
-      setStatus("error");
-      return;
-    }
+  const onSubmit = async (_data: InviteFormData, e?: BaseSyntheticEvent) => {
     setErrorReason(null);
     setStatus("sending");
     try {
-      const res = await fetch("/.netlify/functions/submit-invite-request", {
+      const formEl = e?.target as HTMLFormElement | undefined;
+      const formData = new FormData(formEl);
+      formData.set("form-name", "invite-request");
+      const res = await fetch("/", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: data.name,
-          email: data.email,
-          referredBy: data.referredBy,
-          why: data.why,
-          hCaptchaToken: data["h-captcha-response"],
-        }),
+        body: formData,
       });
-      const json = (await res.json()) as { ok?: boolean; error?: string };
-      if (res.ok && json.ok) {
+      if (res.ok) {
         setStatus("success");
         reset();
-        captchaRef.current?.resetCaptcha();
       } else {
         setErrorReason("submit_failed");
         setStatus("error");
@@ -77,8 +56,13 @@ export function InviteForm() {
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
+      name="invite-request"
+      method="POST"
+      data-netlify="true"
+      data-netlify-recaptcha="true"
       className="mx-auto max-w-xl space-y-6"
     >
+      <input type="hidden" name="form-name" value="invite-request" />
       <div>
         <label htmlFor="name" className="mb-1 block font-geist text-body-sm text-foreground/80">
           Name
@@ -136,30 +120,7 @@ export function InviteForm() {
           <p className="mt-1 text-body-sm text-terracotta">{errors.why.message}</p>
         )}
       </div>
-      <input
-        type="hidden"
-        {...register("h-captcha-response", { required: "Please complete the captcha challenge." })}
-      />
-      <div className="overflow-x-auto">
-        <HCaptcha
-          ref={captchaRef}
-          sitekey={captchaSiteKey}
-          reCaptchaCompat={false}
-          onVerify={(token) => {
-            setValue("h-captcha-response", token, { shouldValidate: true });
-            setErrorReason(null);
-          }}
-          onExpire={() => {
-            setValue("h-captcha-response", "", { shouldValidate: true });
-          }}
-        />
-      </div>
-      {errors["h-captcha-response"] && (
-        <p className="text-body-sm text-terracotta">{errors["h-captcha-response"].message}</p>
-      )}
-      {status === "error" && errorReason === "captcha_missing" && (
-        <p className="text-body-sm text-terracotta">Please complete the captcha challenge, then submit again.</p>
-      )}
+      <div data-netlify-recaptcha="true" />
       {status === "error" && errorReason === "submit_failed" && (
         <p className="text-body-sm text-terracotta">
           Something went wrong sending your request. Please try again, or email us directly.

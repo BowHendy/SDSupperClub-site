@@ -14,7 +14,7 @@ A static website for SDSupperClub — a private, invite-only dining club in San 
 
    Copy `.env.local.example` to `.env.local`. See comments there for:
 
-   - Invitation request form (direct POST + hCaptcha)
+   - Invitation request form (Netlify Forms + Netlify-provided reCAPTCHA)
    - `NEXT_PUBLIC_NETLIFY_IDENTITY_URL` — only if you run the frontend outside Netlify (see below)
    - `NETLIFY_DATABASE_URL` — optional for local-only testing; `npx netlify dev` injects it when Netlify DB is linked
 
@@ -73,8 +73,8 @@ Do these after Neon / Netlify DB is created for the site (code already expects `
 3. **Apply schema:** Run [`netlify/db/schema.sql`](netlify/db/schema.sql) in Neon’s SQL editor, or locally `npm run db:apply-schema` with `NETLIFY_DATABASE_URL` set. If the DB already existed, run [`netlify/db/migration_content.sql`](netlify/db/migration_content.sql) once, then optional [`netlify/db/seed-content.sql`](netlify/db/seed-content.sql).
 4. **Claim Neon** (long-term): **Extensions → Neon → Connect / Claim** so the instance is not removed after the unclaimed trial period ([docs](https://docs.netlify.com/netlify-db/)).
 5. **Trace “signup” issues:** There are two paths:
-  - **Marketing “request invite” form** ([`components/ui/InviteForm.tsx`](components/ui/InviteForm.tsx)): POSTs to `/.netlify/functions/submit-invite-request` and verifies hCaptcha server-side. If it fails, check Netlify → Functions → `submit-invite-request` logs for missing `HCAPTCHA_SECRET` / `RESEND_API_KEY` / `ADMIN_NOTIFICATION_EMAIL`.
-   - **Member account (Identity invite accepted):** Netlify Identity calls **`identity-signup`** → writes to **`users`**. If that fails, open **Netlify → Functions → `identity-signup` → Logs** (typical causes: missing `NETLIFY_DATABASE_URL`, or schema not applied → `relation "users" does not exist`).
+  - **Marketing “request invite” form** ([`components/ui/InviteForm.tsx`](components/ui/InviteForm.tsx)): uses **Netlify Forms** with **Netlify-provided reCAPTCHA**. If submissions fail, check **Netlify → Forms → invite-request** and confirm reCAPTCHA is enabled in Forms spam protection.
+  - **Member account (Identity invite accepted):** Netlify Identity calls **`identity-signup`** → writes to **`users`**. If that fails, open **Netlify → Functions → `identity-signup` → Logs** (typical causes: missing `NETLIFY_DATABASE_URL`, or schema not applied → `relation "users" does not exist`).
 
 ## Admin notification email (secure setup)
 
@@ -153,7 +153,7 @@ Never commit these to the repo or put them in `.env.local` if that file might be
 ## Features
 
 - **Marketing pages** — copy and upcoming fallback from Neon (`get-site-content`) with [`lib/default-site-content.ts`](lib/default-site-content.ts) as offline fallback; past menus from `get-past-meals`.
-- **Invitation form** — direct POST to a Netlify Function + hCaptcha.
+- **Invitation form** — Netlify Forms + Netlify-provided reCAPTCHA.
 - **Members** — Netlify Identity + Netlify DB–backed dashboard.
 
 ## Adding a hero image

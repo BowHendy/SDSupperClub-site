@@ -12,7 +12,6 @@
     "db:apply-schema": "node scripts/apply-netlify-schema.mjs"
   },
   "dependencies": {
-    "@hcaptcha/react-hcaptcha": "^2.0.2",
     "@netlify/functions": "^5.1.5",
     "@netlify/neon": "^0.1.2",
     "framer-motion": "^12.35.2",
