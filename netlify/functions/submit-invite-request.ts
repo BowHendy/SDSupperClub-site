@@ -4,6 +4,28 @@ import { sendEmail } from "./lib/email";
 
 const jsonHeaders = { "Content-Type": "application/json" };
 
+function debugLog(
+  runId: string,
+  hypothesisId: string,
+  location: string,
+  message: string,
+  data: Record<string, unknown>,
+) {
+  fetch("http://127.0.0.1:7716/ingest/b86549cd-061e-4aac-8e7b-ff093d2073af", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "a53e2f" },
+    body: JSON.stringify({
+      sessionId: "a53e2f",
+      runId,
+      hypothesisId,
+      location,
+      message,
+      data,
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+}
+
 function pickString(v: unknown): string | null {
   if (typeof v === "string") return v;
   if (v === null || v === undefined) return null;
@@ -44,6 +66,15 @@ export const handler: Handler = async (event) => {
   }
 
   try {
+    // #region agent log
+    debugLog("pre-fix", "H1", "submit-invite-request.ts:handler:start", "handler start", {
+      hasBody: Boolean(event.body),
+      hasDbUrl: Boolean(process.env.NETLIFY_DATABASE_URL),
+      hasCaptchaSecret: Boolean(process.env.HCAPTCHA_SECRET),
+      hasAdminEmail: Boolean(process.env.ADMIN_NOTIFICATION_EMAIL),
+      hasResendKey: Boolean(process.env.RESEND_API_KEY),
+    });
+    // #endregion
     const body = JSON.parse(event.body || "{}") as Record<string, unknown>;
     const name = pickString(body.name);
     const email = pickString(body.email);
@@ -68,10 +99,22 @@ export const handler: Handler = async (event) => {
       null;
 
     const captchaOk = await verifyHCaptcha(hCaptchaToken, remoteIp);
+    // #region agent log
+    debugLog("pre-fix", "H2", "submit-invite-request.ts:captcha", "captcha verification completed", {
+      captchaOk,
+      hasRemoteIp: Boolean(remoteIp),
+    });
+    // #endregion
     if (!captchaOk) {
       return { statusCode: 400, headers: jsonHeaders, body: JSON.stringify({ error: "captcha failed" }) };
     }
 
+    // #region agent log
+    debugLog("pre-fix", "H3", "submit-invite-request.ts:db:before-insert", "about to insert invitation request", {
+      hasEmail: Boolean(email),
+      hasWhy: Boolean(why),
+    });
+    // #endregion
     await sql`
       INSERT INTO invitation_requests (
         name,
@@ -90,6 +133,9 @@ export const handler: Handler = async (event) => {
         ${source}
       )
     `;
+    // #region agent log
+    debugLog("pre-fix", "H3", "submit-invite-request.ts:db:after-insert", "insert succeeded", {});
+    // #endregion
 
     const adminTo = process.env.ADMIN_NOTIFICATION_EMAIL ?? null;
     if (!adminTo) {
@@ -102,6 +148,11 @@ export const handler: Handler = async (event) => {
     const adminUrl = siteUrl ? `${siteUrl}/admin/` : "/admin/";
 
     try {
+      // #region agent log
+      debugLog("pre-fix", "H4", "submit-invite-request.ts:email:before-send", "about to send admin email", {
+        hasAdminTo: Boolean(adminTo),
+      });
+      // #endregion
       await sendEmail({
         to: adminTo,
         subject: "SDSupperClub — new membership request",
@@ -119,12 +170,27 @@ export const handler: Handler = async (event) => {
           `Admin dashboard: ${adminUrl}`,
         ].join("\n"),
       });
+      // #region agent log
+      debugLog("pre-fix", "H4", "submit-invite-request.ts:email:after-send", "admin email send succeeded", {});
+      // #endregion
     } catch (e) {
+      // #region agent log
+      debugLog("pre-fix", "H4", "submit-invite-request.ts:email:catch", "admin email send failed", {
+        errorName: e instanceof Error ? e.name : typeof e,
+        errorMessage: e instanceof Error ? e.message : String(e),
+      });
+      // #endregion
       console.error("submit-invite-request: failed sending admin email", e);
     }
 
     return { statusCode: 200, headers: jsonHeaders, body: JSON.stringify({ ok: true }) };
   } catch (e) {
+    // #region agent log
+    debugLog("pre-fix", "H5", "submit-invite-request.ts:handler:catch", "handler failed", {
+      errorName: e instanceof Error ? e.name : typeof e,
+      errorMessage: e instanceof Error ? e.message : String(e),
+    });
+    // #endregion
     console.error("submit-invite-request", e);
     return { statusCode: 500, headers: jsonHeaders, body: JSON.stringify({ error: "Server error" }) };
   }
