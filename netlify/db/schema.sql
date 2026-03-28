@@ -33,7 +33,7 @@ create table if not exists public.admins (
   created_at timestamptz not null default now()
 );
 
--- Invitation requests (fed by a Web3Forms webhook).
+-- Invitation requests (fed by Netlify Forms -> submission-created; optional legacy Web3Forms webhook).
 create table if not exists public.invitation_requests (
   id uuid primary key default gen_random_uuid(),
 

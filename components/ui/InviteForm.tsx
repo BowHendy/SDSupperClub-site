@@ -28,9 +28,16 @@ export function InviteForm() {
       const formEl = e?.target as HTMLFormElement | undefined;
       const formData = new FormData(formEl);
       formData.set("form-name", "invite-request");
+      // Netlify Forms AJAX: body must be URL-encoded (not multipart FormData).
+      // @see https://docs.netlify.com/forms/setup/#submit-javascript-rendered-forms-with-ajax
+      const encoded = new URLSearchParams();
+      formData.forEach((value, key) => {
+        encoded.append(key, typeof value === "string" ? value : String(value));
+      });
       const res = await fetch("/", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: encoded.toString(),
       });
       if (res.ok) {
         setStatus("success");

@@ -36,9 +36,9 @@ export const handler: Handler = async (event) => {
     return { statusCode: 405, headers: jsonHeaders, body: JSON.stringify({ error: "Method Not Allowed" }) };
   }
 
-  // Deprecated: Web3Forms webhooks are a paid feature. We keep this handler temporarily for
-  // backwards compatibility while the site transitions to direct POST -> `submit-invite-request`.
-  // New installations should not rely on this endpoint.
+  // Deprecated: Web3Forms webhooks are a paid feature. The marketing invite form uses Netlify
+  // Forms + Netlify reCAPTCHA (`InviteForm.tsx`); submissions do not hit this endpoint. This
+  // handler remains only for legacy Web3Forms integrations that still POST here.
 
   try {
     if (!event.body) {

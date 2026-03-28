@@ -73,12 +73,12 @@ Do these after Neon / Netlify DB is created for the site (code already expects `
 3. **Apply schema:** Run [`netlify/db/schema.sql`](netlify/db/schema.sql) in Neon’s SQL editor, or locally `npm run db:apply-schema` with `NETLIFY_DATABASE_URL` set. If the DB already existed, run [`netlify/db/migration_content.sql`](netlify/db/migration_content.sql) once, then optional [`netlify/db/seed-content.sql`](netlify/db/seed-content.sql).
 4. **Claim Neon** (long-term): **Extensions → Neon → Connect / Claim** so the instance is not removed after the unclaimed trial period ([docs](https://docs.netlify.com/netlify-db/)).
 5. **Trace “signup” issues:** There are two paths:
-  - **Marketing “request invite” form** ([`components/ui/InviteForm.tsx`](components/ui/InviteForm.tsx)): uses **Netlify Forms** with **Netlify-provided reCAPTCHA**. If submissions fail, check **Netlify → Forms → invite-request** and confirm reCAPTCHA is enabled in Forms spam protection.
+  - **Marketing “request invite” form** ([`components/ui/InviteForm.tsx`](components/ui/InviteForm.tsx)): uses **Netlify Forms** with **Netlify-provided reCAPTCHA**. Verified submissions trigger **[`submission-created`](netlify/functions/submission-created.ts)** (event function), which inserts a row into **`invitation_requests`** (for `/admin` APIs) and sends the admin email when Resend env vars are set. If the form fails in the browser, check **Netlify → Forms → invite-request** and confirm reCAPTCHA is enabled under Forms spam protection. If the form succeeds in the UI but nothing appears in the admin list or logs, check **Netlify → Functions → `submission-created` → Logs** (typical causes: missing `NETLIFY_DATABASE_URL`, or schema not applied).
   - **Member account (Identity invite accepted):** Netlify Identity calls **`identity-signup`** → writes to **`users`**. If that fails, open **Netlify → Functions → `identity-signup` → Logs** (typical causes: missing `NETLIFY_DATABASE_URL`, or schema not applied → `relation "users" does not exist`).
 
 ## Admin notification email (secure setup)
 
-[`request-host`](netlify/functions/request-host.ts) emails the club when a member requests to host. Delivery uses [Resend](https://resend.com). The admin inbox and API key exist **only** in the Netlify Functions environment (not in the static site bundle).
+[`request-host`](netlify/functions/request-host.ts) emails the club when a member requests to host. [`submission-created`](netlify/functions/submission-created.ts) can email the same inbox when someone submits the public invite form (after Netlify verifies the submission). Delivery uses [Resend](https://resend.com). The admin inbox and API key exist **only** in the Netlify Functions environment (not in the static site bundle).
 
 ### 1. Netlify environment variables
 
@@ -86,7 +86,7 @@ In **Netlify → Site configuration → Environment variables**, add (scopes: at
 
 | Variable | Purpose |
 | -------- | ------- |
-| `ADMIN_NOTIFICATION_EMAIL` | Inbox that receives host-request notifications (e.g. the club admin’s email). |
+| `ADMIN_NOTIFICATION_EMAIL` | Inbox that receives host-request and new invite-request notifications (e.g. the club admin’s email). |
 | `RESEND_API_KEY` | Resend API key — treat as a secret; restrict who can view Netlify settings. |
 | `RESEND_FROM_EMAIL` | Verified sender, e.g. `SDSupperClub <notifications@yourdomain.com>`. |
 
@@ -127,6 +127,7 @@ Never commit these to the repo or put them in `.env.local` if that file might be
 | Function | Purpose |
 | -------- | ------- |
 | `identity-signup` | Identity trigger — upserts a row in `public.users` |
+| `submission-created` | Forms trigger — verified `invite-request` → `invitation_requests` + optional Resend email to admin |
 | `get-active-meal` | Public — current visible meal + seat counts |
 | `get-past-meals` | Public — past menus for marketing (`meals` with `status = past`) |
 | `get-site-content` | Public — JSON document for hero, experience, membership, contact (`site_content.key = site`) |
@@ -153,7 +154,7 @@ Never commit these to the repo or put them in `.env.local` if that file might be
 ## Features
 
 - **Marketing pages** — copy and upcoming fallback from Neon (`get-site-content`) with [`lib/default-site-content.ts`](lib/default-site-content.ts) as offline fallback; past menus from `get-past-meals`.
-- **Invitation form** — Netlify Forms + Netlify-provided reCAPTCHA.
+- **Invitation form** — Netlify Forms + Netlify-provided reCAPTCHA; `submission-created` writes pending requests to Neon for admin review.
 - **Members** — Netlify Identity + Netlify DB–backed dashboard.
 
 ## Adding a hero image
