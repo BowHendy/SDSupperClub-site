@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+  <body>
+    <!--
+      Static skeleton for Netlify Forms build-time detection.
+      This file is never shown to users — it exists so Netlify's build scanner
+      registers the invite-request form before the site goes live.
+    -->
+    <form name="invite-request" method="POST" data-netlify="true" data-netlify-recaptcha="true" hidden>
+      <input type="hidden" name="form-name" value="invite-request" />
+      <input type="text" name="name" />
+      <input type="email" name="email" />
+      <input type="text" name="referredBy" />
+      <textarea name="why"></textarea>
+    </form>
+  </body>
+</html>
