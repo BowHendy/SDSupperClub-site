@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head><meta charset="utf-8" /><title>Forms</title></head>
+  <body>
+    <!--
+      Static form skeleton for Netlify build-time detection.
+      The React InviteForm submits to this URL via AJAX (fetch POST).
+      Field names must match exactly what InviteForm.tsx sends.
+    -->
+    <form
+      name="invite-request"
+      method="POST"
+      action="/__forms.html"
+      data-netlify="true"
+      data-netlify-recaptcha="true"
+      hidden
+    >
+      <input type="hidden" name="form-name" value="invite-request" />
+      <input type="text"     name="name" />
+      <input type="email"    name="email" />
+      <input type="text"     name="referredBy" />
+      <textarea             name="why"></textarea>
+      <div data-netlify-recaptcha="true"></div>
+    </form>
+  </body>
+</html>

@@ -39,5 +39,6 @@ env.txt
 *.tsbuildinfo
 next-env.d.ts
 
-# Local Netlify folder
-.netlify
+# Local Netlify folder (CLI state, cache) — but allow feature flags that must be deployed
+.netlify/*
+!.netlify/features/

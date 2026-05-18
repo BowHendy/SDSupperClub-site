@@ -82,6 +82,7 @@ export const handler: Handler = async (event) => {
   try {
     const root = JSON.parse(event.body || "{}") as { payload?: Record<string, unknown> };
     const payload = root.payload;
+
     if (!payload || typeof payload !== "object") {
       return { statusCode: 400, headers: jsonHeaders, body: JSON.stringify({ error: "Missing payload" }) };
     }
