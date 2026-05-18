@@ -34,7 +34,7 @@ export function InviteForm() {
       formData.forEach((value, key) => {
         encoded.append(key, typeof value === "string" ? value : String(value));
       });
-      const res = await fetch("/__forms.html", {
+      const res = await fetch("/", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: encoded.toString(),
