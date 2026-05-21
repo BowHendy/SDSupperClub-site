@@ -4,23 +4,25 @@
   <body>
     <!--
       Static form skeleton for Netlify build-time detection.
-      The React InviteForm submits to this URL via AJAX (fetch POST).
+      The React InviteForm submits via AJAX (fetch POST to /).
       Field names must match exactly what InviteForm.tsx sends.
+      Spam protection: Netlify honeypot (bot-field). reCAPTCHA is intentionally
+      omitted — the form is JS-rendered so Netlify cannot inject the widget.
     -->
     <form
       name="invite-request"
       method="POST"
       action="/__forms.html"
       data-netlify="true"
-      data-netlify-recaptcha="true"
+      netlify-honeypot="bot-field"
       hidden
     >
       <input type="hidden" name="form-name" value="invite-request" />
-      <input type="text"     name="name" />
-      <input type="email"    name="email" />
-      <input type="text"     name="referredBy" />
-      <textarea             name="why"></textarea>
-      <div data-netlify-recaptcha="true"></div>
+      <input name="bot-field" />
+      <input type="text"  name="name" />
+      <input type="email" name="email" />
+      <input type="text"  name="referredBy" />
+      <textarea           name="why"></textarea>
     </form>
   </body>
 </html>

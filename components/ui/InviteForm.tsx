@@ -66,10 +66,14 @@ export function InviteForm() {
       name="invite-request"
       method="POST"
       data-netlify="true"
-      data-netlify-recaptcha="true"
+      netlify-honeypot="bot-field"
       className="mx-auto max-w-xl space-y-6"
     >
       <input type="hidden" name="form-name" value="invite-request" />
+      {/* Honeypot: hidden from users, catches spam bots */}
+      <p className="hidden" aria-hidden="true">
+        <input name="bot-field" tabIndex={-1} autoComplete="off" />
+      </p>
       <div>
         <label htmlFor="name" className="mb-1 block font-geist text-body-sm text-foreground/80">
           Name
@@ -127,7 +131,6 @@ export function InviteForm() {
           <p className="mt-1 text-body-sm text-terracotta">{errors.why.message}</p>
         )}
       </div>
-      <div data-netlify-recaptcha="true" />
       {status === "error" && errorReason === "submit_failed" && (
         <p className="text-body-sm text-terracotta">
           Something went wrong sending your request. Please try again, or email us directly.
