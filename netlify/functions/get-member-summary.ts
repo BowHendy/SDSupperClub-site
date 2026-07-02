@@ -1,5 +1,6 @@
 import type { Handler } from "@netlify/functions";
 import { getNetlifyUser, getOrCreateAppUser } from "./lib/auth";
+import { isAdmin } from "./lib/admin";
 import { sql } from "./lib/db";
 
 const jsonHeaders = { "Content-Type": "application/json" };
@@ -69,6 +70,22 @@ export const handler: Handler = async (event, context) => {
     `;
     const approvedHost = approvedRows[0];
 
+    const pendingChefRows = await sql`
+      SELECT id FROM chefs
+      WHERE member_id = ${appUser.id} AND approval_status = 'pending'
+      LIMIT 1
+    `;
+    const pendingChef = pendingChefRows[0];
+
+    const approvedChefRows = await sql`
+      SELECT id FROM chefs
+      WHERE member_id = ${appUser.id} AND approval_status = 'approved'
+      LIMIT 1
+    `;
+    const approvedChef = approvedChefRows[0];
+
+    const admin = await isAdmin(context);
+
     return {
       statusCode: 200,
       headers: jsonHeaders,
@@ -78,8 +95,13 @@ export const handler: Handler = async (event, context) => {
         confirmedCount,
         maxSeats: meal ? (meal.max_seats as number) : null,
         isFull,
+        primaryRole: appUser.primary_role,
+        profileComplete: appUser.profile_complete,
         isHostApproved: Boolean(approvedHost),
         pendingHostRequest: Boolean(pendingHost),
+        isChefApproved: Boolean(approvedChef),
+        pendingChefRequest: Boolean(pendingChef),
+        isAdmin: admin,
       }),
     };
   } catch (e) {

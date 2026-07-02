@@ -13,10 +13,47 @@ export function getNetlifyUser(context: HandlerContext): NetlifyUser | null {
   return raw;
 }
 
+export type PrimaryRole = "guest" | "member" | "host" | "chef";
+
 export type AppUser = {
   id: string;
   is_member_approved: boolean;
+  primary_role: PrimaryRole;
+  profile_complete: boolean;
 };
+
+function normalizeRole(value: unknown): PrimaryRole {
+  return value === "member" || value === "host" || value === "chef" ? value : "guest";
+}
+
+/** Set a member's primary role. Admin overrides + lifecycle promotions use this. */
+export async function setPrimaryRole(memberId: string, role: PrimaryRole): Promise<void> {
+  await sql`
+    UPDATE members SET primary_role = ${role} WHERE id = ${memberId}
+  `;
+}
+
+/** Link pending meal-first seat requests to a member after Identity signup. */
+export async function linkMealSeatRequests(memberId: string, email: string | null): Promise<void> {
+  if (!email) return;
+  const pending = await sql`
+    SELECT id, dinner_id FROM meal_seat_requests
+    WHERE email = ${email} AND status = 'pending'
+  `;
+  for (const row of pending as { id: string; dinner_id: string }[]) {
+    await sql`
+      INSERT INTO dinner_guests (dinner_id, member_id, status)
+      VALUES (${row.dinner_id}, ${memberId}, 'waitlisted')
+      ON CONFLICT (dinner_id, member_id) DO NOTHING
+    `;
+    await sql`
+      UPDATE meal_seat_requests SET status = 'linked' WHERE id = ${row.id}
+    `;
+  }
+  if ((pending as unknown[]).length > 0) {
+    await sql`UPDATE members SET is_approved = true WHERE id = ${memberId}`;
+  }
+}
 
 export async function getOrCreateAppUser(netlifyUser: NetlifyUser): Promise<AppUser> {
   const fullName =
@@ -48,12 +85,14 @@ export async function getOrCreateAppUser(netlifyUser: NetlifyUser): Promise<AppU
   const shouldBeApproved = Boolean(approvedInvite);
 
   const existingRows = await sql`
-    SELECT id, is_approved
+    SELECT id, is_approved, primary_role, profile_complete
     FROM members
     WHERE netlify_identity_id = ${netlifyUser.sub}
     LIMIT 1
   `;
-  const existing = existingRows[0] as { id: string; is_approved: boolean } | undefined;
+  const existing = existingRows[0] as
+    | { id: string; is_approved: boolean; primary_role: string; profile_complete: boolean }
+    | undefined;
   if (existing) {
     // Keep the row id stable, but allow approval to "turn on" when admins approve the invite later.
     if (shouldBeApproved && !existing.is_approved) {
@@ -65,7 +104,17 @@ export async function getOrCreateAppUser(netlifyUser: NetlifyUser): Promise<AppU
         WHERE id = ${existing.id}
       `;
     }
-    return { id: String(existing.id), is_member_approved: Boolean(shouldBeApproved || existing.is_approved) };
+    await linkMealSeatRequests(existing.id, email);
+    const guestRows = await sql`
+      SELECT 1 AS ok FROM dinner_guests WHERE member_id = ${existing.id} LIMIT 1
+    `;
+    const mealFirst = Boolean(guestRows[0]);
+    return {
+      id: String(existing.id),
+      is_member_approved: Boolean(shouldBeApproved || existing.is_approved || mealFirst),
+      primary_role: normalizeRole(existing.primary_role),
+      profile_complete: Boolean(existing.profile_complete),
+    };
   }
 
   const createdRows = await sql`
@@ -75,7 +124,8 @@ export async function getOrCreateAppUser(netlifyUser: NetlifyUser): Promise<AppU
       first_name,
       surname,
       referred_by,
-      is_approved
+      is_approved,
+      primary_role
     )
     VALUES (
       ${netlifyUser.sub},
@@ -83,12 +133,25 @@ export async function getOrCreateAppUser(netlifyUser: NetlifyUser): Promise<AppU
       ${firstName},
       ${surname},
       ${approvedInvite?.referred_by ?? null},
-      ${shouldBeApproved}
+      ${shouldBeApproved},
+      'guest'
     )
-    RETURNING id, is_approved
+    RETURNING id, is_approved, primary_role, profile_complete
   `;
 
-  const created = createdRows[0] as { id: string; is_approved: boolean } | undefined;
+  const created = createdRows[0] as
+    | { id: string; is_approved: boolean; primary_role: string; profile_complete: boolean }
+    | undefined;
   if (!created) throw new Error("Failed to create member");
-  return { id: String(created.id), is_member_approved: Boolean(created.is_approved) };
+  await linkMealSeatRequests(created.id, email);
+  const guestRows = await sql`
+    SELECT 1 AS ok FROM dinner_guests WHERE member_id = ${created.id} LIMIT 1
+  `;
+  const mealFirst = Boolean(guestRows[0]);
+  return {
+    id: String(created.id),
+    is_member_approved: Boolean(created.is_approved || mealFirst),
+    primary_role: normalizeRole(created.primary_role),
+    profile_complete: Boolean(created.profile_complete),
+  };
 }
