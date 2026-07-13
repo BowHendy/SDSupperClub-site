@@ -127,7 +127,7 @@ export const handler: Handler = async (event) => {
     try {
       await sendEmail({
         to: adminTo,
-        subject: "SDSupperClub — new membership request",
+        subject: "Supper Collective — new membership request",
         text: [
           "A new membership request was submitted.",
           "",

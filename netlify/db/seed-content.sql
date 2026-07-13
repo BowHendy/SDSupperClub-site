@@ -80,7 +80,7 @@ values (
       "items": [
         { "label": "One dinner per month", "key": "frequency" },
         { "label": "10 guests, invite-only", "key": "guests" },
-        { "label": "Hosted in a member's San Diego home", "key": "venue" },
+        { "label": "Hosted in a member's home", "key": "venue" },
         { "label": "Chef-curated seasonal menu", "key": "menu" }
       ],
       "bridge": "Every month. Different host, different home, different food.",
@@ -96,8 +96,8 @@ values (
     },
     "contact": {
       "instagram": "https://instagram.com/sdsupperclub",
-      "email": "hello@sdsupperclub.com",
-      "location": "San Diego, CA"
+      "email": "hello@suppercollective.org",
+      "location": "United States"
     },
     "upcomingFallback": {
       "month": "March",

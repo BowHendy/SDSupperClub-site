@@ -12,7 +12,7 @@ async function notifyAdminEmail(subject: string, text: string): Promise<void> {
     return;
   }
 
-  const from = process.env.RESEND_FROM_EMAIL ?? "SDSupperClub <onboarding@resend.dev>";
+  const from = process.env.RESEND_FROM_EMAIL ?? "Supper Collective <onboarding@resend.dev>";
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -49,12 +49,36 @@ export const handler: Handler = async (event, context) => {
 
     const address = (body.address as string | undefined) ?? "";
     const mobilePhone = (body.mobilePhone as string | undefined) ?? "";
+    const allergies = (body.allergies as string | undefined) ?? "";
+    const kitchenPhotoUrl = (body.kitchenPhotoUrl as string | undefined) ?? "";
+    const diningPhotoUrl = (body.diningPhotoUrl as string | undefined) ?? "";
     const cutlery = Boolean(body.cutlery);
     const glassware = Boolean(body.glassware);
     const crockery = Boolean(body.crockery);
 
-    if (!address.trim()) {
-      return { statusCode: 400, headers: jsonHeaders, body: JSON.stringify({ error: "address required" }) };
+    // Full host profile must be complete BEFORE submitting for admin approval.
+    const missing: string[] = [];
+    if (!address.trim()) missing.push("address");
+    if (!mobilePhone.trim()) missing.push("mobilePhone");
+    if (!kitchenPhotoUrl.trim()) missing.push("kitchenPhotoUrl");
+    if (!diningPhotoUrl.trim()) missing.push("diningPhotoUrl");
+    if (missing.length > 0) {
+      return {
+        statusCode: 400,
+        headers: jsonHeaders,
+        body: JSON.stringify({ error: "Incomplete host profile", missing }),
+      };
+    }
+
+    // Cutlery, glassware, and crockery for 10 must all be confirmed at submit.
+    if (!cutlery || !glassware || !crockery) {
+      return {
+        statusCode: 400,
+        headers: jsonHeaders,
+        body: JSON.stringify({
+          error: "You must confirm cutlery, glassware, and crockery for 10 guests before applying.",
+        }),
+      };
     }
 
     const fullName =
@@ -94,6 +118,9 @@ export const handler: Handler = async (event, context) => {
         email,
         mobile_phone,
         address,
+        allergies,
+        kitchen_photo_url,
+        dining_photo_url,
         cutlery,
         glassware,
         crockery,
@@ -107,6 +134,9 @@ export const handler: Handler = async (event, context) => {
         ${netlifyUser.email ?? null},
         ${mobilePhone || null},
         ${address},
+        ${allergies || null},
+        ${kitchenPhotoUrl},
+        ${diningPhotoUrl},
         ${cutlery},
         ${glassware},
         ${crockery},
@@ -116,6 +146,9 @@ export const handler: Handler = async (event, context) => {
       ON CONFLICT (member_id) DO UPDATE SET
         address = EXCLUDED.address,
         mobile_phone = EXCLUDED.mobile_phone,
+        allergies = EXCLUDED.allergies,
+        kitchen_photo_url = EXCLUDED.kitchen_photo_url,
+        dining_photo_url = EXCLUDED.dining_photo_url,
         cutlery = EXCLUDED.cutlery,
         glassware = EXCLUDED.glassware,
         crockery = EXCLUDED.crockery,
@@ -127,7 +160,7 @@ export const handler: Handler = async (event, context) => {
     `;
 
     await notifyAdminEmail(
-      "SDSupperClub — request to host",
+      "Supper Collective — request to host",
       [
         "A member requested to host.",
         "",

@@ -4,6 +4,7 @@ import { GeistSans } from "geist/font/sans";
 import { CustomCursor } from "@/components/cursor/CustomCursor";
 import { Navigation } from "@/components/nav/Navigation";
 import { SiteContentProvider } from "@/components/providers/SiteContentProvider";
+import { NetlifyIdentityBootstrap } from "@/components/providers/NetlifyIdentityBootstrap";
 import { ContactFooter } from "@/components/sections/ContactFooter";
 import "./globals.css";
 
@@ -15,13 +16,13 @@ const cormorant = Cormorant_Garamond({
 });
 
 export const metadata: Metadata = {
-  title: "SDSupperClub — San Diego",
+  title: "Supper Collective",
   description:
-    "A private, invite-only dining club in San Diego. Ten seats. One chef. Someone's home. Once a month.",
+    "A private, invite-only dining collective. Ten seats. One chef. Someone's home. Once a month.",
   openGraph: {
-    title: "SDSupperClub — San Diego",
+    title: "Supper Collective",
     description:
-      "A private, invite-only dining club in San Diego. Ten seats. One chef. Someone's home. Once a month.",
+      "A private, invite-only dining collective. Ten seats. One chef. Someone's home. Once a month.",
   },
 };
 
@@ -34,6 +35,7 @@ export default function RootLayout({
     <html lang="en" className={`${cormorant.variable} ${GeistSans.variable}`}>
       <body className="min-h-screen font-geist text-foreground antialiased">
         <SiteContentProvider>
+          <NetlifyIdentityBootstrap />
           <CustomCursor />
           <Navigation />
           <main>{children}</main>

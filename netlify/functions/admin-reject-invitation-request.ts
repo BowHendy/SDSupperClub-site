@@ -2,6 +2,7 @@ import type { Handler } from "@netlify/functions";
 import { requireAdmin } from "./lib/admin";
 import { sql } from "./lib/db";
 import { sendEmail } from "./lib/email";
+import { buildRejectionEmail } from "./lib/email-templates";
 
 const jsonHeaders = { "Content-Type": "application/json" };
 
@@ -20,12 +21,12 @@ export const handler: Handler = async (event, context) => {
     }
 
     const rows = await sql`
-      SELECT id, email, status
+      SELECT id, name, email, status
       FROM invitation_requests
       WHERE id = ${requestId}
       LIMIT 1
     `;
-    const req = rows[0] as { id: string; email: string; status: string } | undefined;
+    const req = rows[0] as { id: string; name: string | null; email: string; status: string } | undefined;
     if (!req) {
       return { statusCode: 404, headers: jsonHeaders, body: JSON.stringify({ error: "Not found" }) };
     }
@@ -40,18 +41,12 @@ export const handler: Handler = async (event, context) => {
       `;
     }
 
+    const rejection = buildRejectionEmail(req.name, note);
     await sendEmail({
       to: req.email,
-      subject: "SDSupperClub — update on your request",
-      text: [
-        "Thanks for your interest in SDSupperClub.",
-        "",
-        "At this point in time, we’re not able to offer you membership.",
-        note ? "" : null,
-        note ? `Note from the team:\n${note}` : null,
-      ]
-        .filter((line): line is string => Boolean(line))
-        .join("\n"),
+      subject: rejection.subject,
+      text: rejection.text,
+      html: rejection.html,
     });
 
     return { statusCode: 200, headers: jsonHeaders, body: JSON.stringify({ ok: true }) };

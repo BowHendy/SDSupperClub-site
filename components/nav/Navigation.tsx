@@ -30,7 +30,7 @@ export function Navigation() {
           href="/"
           className="font-cormorant text-xl font-medium text-foreground transition-opacity hover:opacity-90 md:text-2xl"
         >
-          SD Supper Club
+          Supper Collective
         </Link>
 
         <ul className="hidden items-center gap-8 md:flex">
@@ -47,10 +47,10 @@ export function Navigation() {
         </ul>
 
         <Link
-          href="/#request-invite"
+          href="/#calendar"
           className="rounded border border-foreground/60 px-4 py-2 text-body-sm text-foreground transition-all duration-300 hover:border-foreground hover:bg-foreground hover:text-background"
         >
-          Request Invite
+          Request a seat
         </Link>
       </nav>
     </header>

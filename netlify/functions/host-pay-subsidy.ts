@@ -1,0 +1,79 @@
+import type { Handler } from "@netlify/functions";
+import { getNetlifyUser, getOrCreateAppUser } from "./lib/auth";
+import { getApprovedHostForMember, hostOwnsDinner } from "./lib/host";
+import { countPaidSeats } from "./lib/meal";
+import { recordPayment, stripeEnabled } from "./lib/stripe";
+import { sql } from "./lib/db";
+
+const jsonHeaders = { "Content-Type": "application/json" };
+
+export const handler: Handler = async (event, context) => {
+  if (event.httpMethod !== "POST") {
+    return { statusCode: 405, headers: jsonHeaders, body: JSON.stringify({ error: "Method Not Allowed" }) };
+  }
+
+  const netlifyUser = getNetlifyUser(context);
+  if (!netlifyUser) {
+    return { statusCode: 401, headers: jsonHeaders, body: JSON.stringify({ error: "Unauthorized" }) };
+  }
+
+  try {
+    const body = JSON.parse(event.body || "{}");
+    const dinnerId = body.dinnerId as string | undefined;
+    if (!dinnerId) {
+      return { statusCode: 400, headers: jsonHeaders, body: JSON.stringify({ error: "dinnerId required" }) };
+    }
+
+    const appUser = await getOrCreateAppUser(netlifyUser);
+    const host = await getApprovedHostForMember(appUser.id);
+    if (!host || !(await hostOwnsDinner(host.id, dinnerId))) {
+      return { statusCode: 403, headers: jsonHeaders, body: JSON.stringify({ error: "Not your dinner" }) };
+    }
+
+    const mealRows = await sql`
+      SELECT max_seats, meal_price_per_guest FROM dinners WHERE id = ${dinnerId} LIMIT 1
+    `;
+    const meal = mealRows[0] as { max_seats: number; meal_price_per_guest: number | null } | undefined;
+    if (!meal?.meal_price_per_guest) {
+      return { statusCode: 400, headers: jsonHeaders, body: JSON.stringify({ error: "Meal price not set" }) };
+    }
+
+    const paid = await countPaidSeats(dinnerId);
+    const shortfall = Math.max(0, meal.max_seats - paid);
+    if (shortfall <= 0) {
+      return { statusCode: 400, headers: jsonHeaders, body: JSON.stringify({ error: "No subsidy needed" }) };
+    }
+
+    const amount = shortfall * Number(meal.meal_price_per_guest);
+
+    if (!stripeEnabled()) {
+      await sql`
+        UPDATE dinners
+        SET subsidy_required = true,
+            subsidy_paid_amount = subsidy_paid_amount + ${amount},
+            status = 'subsidy_pending'
+        WHERE id = ${dinnerId}
+      `;
+      return { statusCode: 200, headers: jsonHeaders, body: JSON.stringify({ ok: true, mode: "demo", amount }) };
+    }
+
+    await recordPayment({
+      dinnerId,
+      memberId: appUser.id,
+      kind: "host_subsidy",
+      amount,
+    });
+    await sql`
+      UPDATE dinners
+      SET subsidy_required = true,
+          subsidy_paid_amount = subsidy_paid_amount + ${amount},
+          status = 'subsidy_pending'
+      WHERE id = ${dinnerId}
+    `;
+
+    return { statusCode: 200, headers: jsonHeaders, body: JSON.stringify({ ok: true, mode: "stripe", amount }) };
+  } catch (e) {
+    console.error("host-pay-subsidy", e);
+    return { statusCode: 500, headers: jsonHeaders, body: JSON.stringify({ error: "Server error" }) };
+  }
+};

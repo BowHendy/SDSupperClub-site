@@ -1,15 +1,13 @@
 "use client";
 
-import { loadNetlifyIdentity } from "./netlify-identity";
+import { getAccessToken } from "./netlify-access-token";
 import { netlifyFunctionUrl } from "./netlify-paths";
 
 export { netlifyFunctionUrl };
 
 /** Authenticated fetch to Netlify Functions (Identity JWT). */
 export async function fetchAuthed(path: string, init?: RequestInit): Promise<Response> {
-  const ni = await loadNetlifyIdentity();
-  const user = ni.currentUser();
-  const token = user?.token?.access_token;
+  const token = await getAccessToken();
   if (!token) {
     throw new Error("Not authenticated");
   }

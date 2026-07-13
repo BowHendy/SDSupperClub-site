@@ -1,6 +1,8 @@
-# SDSupperClub
+# Supper Collective
 
-A static website for SDSupperClub — a private, invite-only dining club in San Diego. Built with Next.js (App Router), Tailwind CSS, and Framer Motion. Deployed on **Netlify** with **Netlify Identity**, **Netlify Functions**, and [**Netlify DB**](https://docs.netlify.com/netlify-db/) (Neon Postgres) for members, meals, and RSVPs.
+A static website for Supper Collective — a private, invite-only dining collective. Built with Next.js (App Router), Tailwind CSS, and Framer Motion. Deployed on **Netlify** with **Netlify Identity**, **Netlify Functions**, and [**Netlify DB**](https://docs.netlify.com/netlify-db/) (Neon Postgres) for members, meals, and RSVPs.
+
+Production: [suppercollective.org](https://suppercollective.org). Legacy domain `sandiegosupperclub.com` should 301 to the primary domain. See [`docs/domain-migration-runbook.md`](docs/domain-migration-runbook.md) for cutover steps.
 
 ## Setup
 
@@ -72,7 +74,8 @@ Do these after Neon / Netlify DB is created for the site (code already expects `
 2. **Verify env in Netlify:** **Site configuration → Environment variables** → confirm **`NETLIFY_DATABASE_URL`** exists for **Production** (and **Deploy previews** if previews should use the DB). For a quick local check: same variable in `.env.local`, then `npm run db:verify`.
 3. **Apply schema:** Run [`netlify/db/schema.sql`](netlify/db/schema.sql) in Neon’s SQL editor, or locally `npm run db:apply-schema` with `NETLIFY_DATABASE_URL` set. If the DB already existed, run [`netlify/db/migration_content.sql`](netlify/db/migration_content.sql) once, then optional [`netlify/db/seed-content.sql`](netlify/db/seed-content.sql).
 4. **Claim Neon** (long-term): **Extensions → Neon → Connect / Claim** so the instance is not removed after the unclaimed trial period ([docs](https://docs.netlify.com/netlify-db/)).
-5. **Trace “signup” issues:** There are two paths:
+5. **Domain rebrand (production):** Run [`netlify/db/migrate-rebrand-site-content.sql`](netlify/db/migrate-rebrand-site-content.sql) in Neon after deploy; follow [`docs/domain-migration-runbook.md`](docs/domain-migration-runbook.md) and run `npm run verify:migration`.
+6. **Trace “signup” issues:** There are two paths:
   - **Marketing “request invite” form** ([`components/ui/InviteForm.tsx`](components/ui/InviteForm.tsx)): uses **Netlify Forms** with **Netlify-provided reCAPTCHA**. Verified submissions trigger **[`submission-created`](netlify/functions/submission-created.ts)** (event function), which inserts a row into **`invitation_requests`** (for `/admin` APIs) and sends the admin email when Resend env vars are set. If the form fails in the browser, check **Netlify → Forms → invite-request** and confirm reCAPTCHA is enabled under Forms spam protection. If the form succeeds in the UI but nothing appears in the admin list or logs, check **Netlify → Functions → `submission-created` → Logs** (typical causes: missing `NETLIFY_DATABASE_URL`, or schema not applied).
   - **Member account (Identity invite accepted):** Netlify Identity calls **`identity-signup`** → writes to **`users`**. If that fails, open **Netlify → Functions → `identity-signup` → Logs** (typical causes: missing `NETLIFY_DATABASE_URL`, or schema not applied → `relation "users" does not exist`).
 
@@ -88,7 +91,7 @@ In **Netlify → Site configuration → Environment variables**, add (scopes: at
 | -------- | ------- |
 | `ADMIN_NOTIFICATION_EMAIL` | Inbox that receives host-request and new invite-request notifications (e.g. the club admin’s email). |
 | `RESEND_API_KEY` | Resend API key — treat as a secret; restrict who can view Netlify settings. |
-| `RESEND_FROM_EMAIL` | Verified sender, e.g. `SDSupperClub <notifications@yourdomain.com>`. |
+| `RESEND_FROM_EMAIL` | Verified sender, e.g. `Supper Collective <hello@suppercollective.org>`. |
 
 Never commit these to the repo or put them in `.env.local` if that file might be pushed. Keep [.env.local.example](.env.local.example) as placeholders only.
 

@@ -1,8 +1,8 @@
-# SDSupperClub — Site map & user flows
+# Supper Collective — Site map & user flows
 
 This document describes the **public routes**, **home-page sections**, **authenticated areas**, **Netlify Functions**, and **typical user journeys** as implemented in this repository.
 
-Production site: [sandiegosupperclub.com](https://www.sandiegosupperclub.com/)
+Production site: [suppercollective.org](https://suppercollective.org) (legacy [sandiegosupperclub.com](https://sandiegosupperclub.com) redirects here).
 
 ---
 
@@ -10,10 +10,14 @@ Production site: [sandiegosupperclub.com](https://www.sandiegosupperclub.com/)
 
 | Route | Built? | Access | Purpose |
 | ----- | ------ | ------ | ------- |
-| `/` | Yes | Public | Marketing site + join request form |
+| `/` | Yes | Public | Marketing site + meal seat request on calendar |
 | `/login/` | Yes | Public | Netlify Identity sign-in |
-| `/members/` | Yes | Members (Identity) | Dashboard: meal, RSVP, pay stub, host request |
-| `/admin/` | Yes | Admins (Identity) | Review, approve, or reject join requests |
+| `/guest/` | Yes | Identity | Guest home — meal RSVP, profile, host/chef apply |
+| `/member/` | Yes | Identity | Member home (same workspace; verified label) |
+| `/host/` | Yes | Identity (host) | Host workspace — meal CRUD, attendees, dual confirm |
+| `/chef/` | Yes | Identity (chef) | Chef workspace — pricing, dashboard |
+| `/members/` | Yes | Identity | Redirects to role home (`/guest/` or `/member/` etc.) |
+| `/admin/` | Yes | Admins (Identity) | Tabs: Applications, Meals, Funds, Disputes, Invitations (legacy) |
 | `/lander` | **No** | — | Not in codebase; live URL returns 404 unless you add a page or redirect |
 
 The marketing entry point is **`/`**, not `/lander`.
@@ -35,7 +39,7 @@ flowchart TB
     EXP["#experience — Experience"]
     PAST["#past-menus — Past Menus"]
     JOIN["#how-to-join — How to Join"]
-    FORM["#request-invite — InviteForm"]
+    FORM["#calendar — MealRequestForm (meal-first)"]
     CAL["#calendar — Upcoming Dinner"]
   end
 
@@ -147,18 +151,24 @@ Invoked at `/.netlify/functions/<name>` (or via `netlifyFunctionUrl()` in the ap
 
 | Function | Called from |
 | -------- | ----------- |
-| `get-member-summary` | `/members/` |
+| `get-member-summary` | `/members/` — returns `primaryRole`, `profileComplete`, host/chef approval flags |
 | `request-attendance` | `/members/` |
 | `confirm-payment` | `/members/` (stub — no real payment provider) |
-| `request-host` | `/members/` → optional Resend email to admin |
+| `request-host` | `/members/` → requires full profile + photos + equipment-for-10 before submit; Resend email to admin |
+| `chef-apply` | `/members/` → chef application (CV + references required); Resend email to admin |
+| `host-list-attendees` | host workspace — waitlist for a dinner the host owns |
+| `host-review-attendee` | host workspace — approve/reject a waitlisted attendee (blocked until T−30 dual confirm) |
 
 ### Admin (Identity JWT + admin role)
 
 | Function | Called from |
 | -------- | ----------- |
-| `admin-list-invitation-requests` | `/admin/` |
+| `admin-list-invitation-requests` | `/admin/` → Invitations tab (legacy) |
 | `admin-approve-invitation-request` | `/admin/` → Identity invite + Resend helper email |
 | `admin-reject-invitation-request` | `/admin/` → optional Resend email to applicant |
+| `admin-list-applications` | `/admin/` → Applications tab (pending host + chef applications) |
+| `admin-review-host` | `/admin/` → approve/reject host; sets `primary_role = host`; Resend email |
+| `admin-review-chef` | `/admin/` → approve/reject chef; sets `primary_role = chef`; Resend email |
 
 ### Other
 
@@ -176,7 +186,7 @@ Invoked at `/.netlify/functions/<name>` (or via `netlifyFunctionUrl()` in the ap
 ```mermaid
 sequenceDiagram
   participant Visitor
-  participant Site as sandiegosupperclub.com
+  participant Site as suppercollective.org
   participant Forms as Netlify Forms
   participant Fn as submission-created
   participant Resend
@@ -261,7 +271,7 @@ flowchart LR
 
 | From | To | How |
 | ---- | -- | --- |
-| Any page | `/` | Logo “SD Supper Club” |
+| Any page | `/` | Logo “Supper Collective” |
 | `/` | `#experience`, `#past-menus`, `#how-to-join`, `#calendar` | Nav links |
 | `/` | `#request-invite` | “Request Invite” button |
 | `/` → Upcoming Dinner | `/login/` | “Log in” when meal is live |

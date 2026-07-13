@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSiteContent } from "@/components/providers/SiteContentProvider";
 import { FadeIn } from "@/components/ui/FadeIn";
+import { MealRequestForm } from "@/components/ui/MealRequestForm";
 import { netlifyFunctionUrl } from "@/lib/netlify-paths";
 
 type Meal = {
@@ -12,37 +13,27 @@ type Meal = {
   year: number;
   neighborhood: string;
   chef_name: string;
+  title: string | null;
   status: string;
-};
-
-type ActiveMealResponse = {
-  meal: Meal | null;
   isFull?: boolean;
-  error?: string;
 };
 
 export function UpcomingDinner() {
   const { site } = useSiteContent();
   const fallback = site.upcomingFallback;
   const [loading, setLoading] = useState(true);
-  const [meal, setMeal] = useState<Meal | null>(null);
-  const [isFull, setIsFull] = useState(false);
+  const [meals, setMeals] = useState<Meal[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(netlifyFunctionUrl("get-active-meal"));
-        const data = (await res.json()) as ActiveMealResponse;
+        const res = await fetch(netlifyFunctionUrl("get-public-meals"));
+        const data = (await res.json()) as { meals?: Meal[] };
         if (cancelled) return;
-        if (res.ok && data.meal) {
-          setMeal(data.meal);
-          setIsFull(Boolean(data.isFull));
-        } else {
-          setMeal(null);
-        }
+        setMeals(data.meals ?? []);
       } catch {
-        if (!cancelled) setMeal(null);
+        if (!cancelled) setMeals([]);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -52,64 +43,69 @@ export function UpcomingDinner() {
     };
   }, []);
 
-  const display = meal ?? {
-    id: "fallback",
-    month: fallback.month,
-    year: fallback.year,
-    neighborhood: fallback.neighborhood,
-    chef_name: fallback.chefName,
-    status: "upcoming",
-  };
-
-  const showFull = isFull || (meal && meal.status === "full");
-  const showCta = !loading && !showFull && (!meal || meal.status === "live");
-
   return (
-    <section
-      id="calendar"
-      className="scroll-mt-24 border-t border-white/10 bg-charcoal py-24 md:py-32"
-    >
+    <section id="calendar" className="scroll-mt-24 border-t border-white/10 bg-charcoal py-24 md:py-32">
       <div className="mx-auto max-w-2xl px-6 md:px-8">
         <FadeIn>
-          <h2 className="font-cormorant text-display-sm font-medium text-foreground">Upcoming Dinner</h2>
+          <h2 className="font-cormorant text-display-sm font-medium text-foreground">Upcoming Dinners</h2>
+          <p className="mt-4 font-geist text-body-sm text-foreground/70">
+            Meals appear here after host and chef confirm at T−30. Request a seat to get started.
+          </p>
         </FadeIn>
-        <FadeIn delay={0.1}>
-          <div className="mt-8 rounded border border-white/15 bg-charcoal/80 p-8 backdrop-blur-sm">
-            {loading ? (
-              <div className="space-y-3 animate-pulse">
-                <div className="h-4 w-40 rounded bg-white/10" />
-                <div className="h-6 w-64 rounded bg-white/10" />
-              </div>
-            ) : (
-              <>
-                <p className="font-geist text-label uppercase tracking-wider text-brass">
-                  {display.month} {display.year} · {display.neighborhood}
-                </p>
-                <p className="mt-2 font-cormorant text-xl text-foreground">Chef {display.chef_name}</p>
-                {showFull && (
-                  <p className="mt-6 inline-block rounded border border-brass/50 px-3 py-1 font-geist text-label uppercase tracking-wider text-brass">
-                    Full
-                  </p>
-                )}
-                {showCta && (
-                  <p className="mt-6">
-                    <Link
-                      href="/login/"
-                      className="inline-block rounded border border-foreground/60 px-5 py-2.5 font-geist text-body-sm text-foreground transition-all duration-300 hover:border-foreground hover:bg-foreground hover:text-background"
-                    >
-                      {fallback.cta}
-                    </Link>
-                  </p>
-                )}
-                {!showFull && !showCta && meal && (
-                  <p className="mt-6 font-geist text-body-sm text-foreground/60">
-                    The next dinner will be announced here when seats open.
-                  </p>
-                )}
-              </>
-            )}
+
+        {loading ? (
+          <div className="mt-8 animate-pulse space-y-3">
+            <div className="h-24 rounded bg-white/10" />
           </div>
-        </FadeIn>
+        ) : meals.length === 0 ? (
+          <FadeIn delay={0.1}>
+            <div className="mt-8 rounded border border-white/15 bg-charcoal/80 p-8">
+              <p className="font-geist text-label uppercase tracking-wider text-brass">
+                {fallback.month} {fallback.year} · {fallback.neighborhood}
+              </p>
+              <p className="mt-2 font-cormorant text-xl text-foreground">Chef {fallback.chefName}</p>
+              <p className="mt-4 font-geist text-body-sm text-foreground/60">
+                The next dinner will be announced here when seats open.
+              </p>
+            </div>
+          </FadeIn>
+        ) : (
+          <div className="mt-8 space-y-8">
+            {meals.map((meal) => (
+              <FadeIn key={meal.id} delay={0.05}>
+                <div className="rounded border border-white/15 bg-charcoal/80 p-8">
+                  <p className="font-geist text-label uppercase tracking-wider text-brass">
+                    {meal.month} {meal.year} · {meal.neighborhood}
+                  </p>
+                  {meal.title && (
+                    <p className="mt-1 font-geist text-body-sm text-foreground/80">{meal.title}</p>
+                  )}
+                  <p className="mt-2 font-cormorant text-xl text-foreground">Chef {meal.chef_name}</p>
+                  {meal.isFull || meal.status === "full" ? (
+                    <p className="mt-4 inline-block rounded border border-brass/50 px-3 py-1 font-geist text-label uppercase text-brass">
+                      Full
+                    </p>
+                  ) : (
+                    <>
+                      <div className="mt-6">
+                        <MealRequestForm
+                          dinnerId={meal.id}
+                          dinnerLabel={`${meal.month} ${meal.year}`}
+                        />
+                      </div>
+                      <p className="mt-4 font-geist text-body-sm text-foreground/60">
+                        Already have an account?{" "}
+                        <Link href="/login/" className="text-brass underline">
+                          Log in
+                        </Link>
+                      </p>
+                    </>
+                  )}
+                </div>
+              </FadeIn>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );

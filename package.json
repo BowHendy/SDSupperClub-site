@@ -1,5 +1,5 @@
 {
-  "name": "sdsupperclub",
+  "name": "supper-collective",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,10 +9,14 @@
     "start": "next start",
     "lint": "next lint",
     "db:verify": "node scripts/verify-netlify-db.mjs",
-    "db:apply-schema": "node scripts/apply-netlify-schema.mjs"
+    "db:apply-schema": "node scripts/apply-netlify-schema.mjs",
+    "db:seed-admins": "node scripts/seed-admins.mjs",
+    "health": "node scripts/check-site-health.mjs",
+    "verify:migration": "node scripts/verify-domain-migration.mjs"
   },
   "dependencies": {
     "@netlify/functions": "^5.1.5",
+    "@netlify/identity": "^1.2.0",
     "@netlify/neon": "^0.1.2",
     "framer-motion": "^12.35.2",
     "geist": "^1.7.0",

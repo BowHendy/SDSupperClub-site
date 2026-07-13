@@ -4,6 +4,7 @@ export type SendEmailParams = {
   to: string;
   subject: string;
   text: string;
+  html?: string;
 };
 
 export async function sendEmail(params: SendEmailParams): Promise<void> {
@@ -11,7 +12,17 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
   if (!apiKey) {
     throw new Error("Missing RESEND_API_KEY");
   }
-  const from = process.env.RESEND_FROM_EMAIL ?? "SDSupperClub <onboarding@resend.dev>";
+  const from = process.env.RESEND_FROM_EMAIL ?? "Supper Collective <onboarding@resend.dev>";
+
+  const body: Record<string, unknown> = {
+    from,
+    to: [params.to],
+    subject: params.subject,
+    text: params.text,
+  };
+  if (params.html) {
+    body.html = params.html;
+  }
 
   const res = await fetch(RESEND_API_URL, {
     method: "POST",
@@ -19,12 +30,7 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      from,
-      to: [params.to],
-      subject: params.subject,
-      text: params.text,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {

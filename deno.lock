@@ -11,8 +11,8 @@
   "workspace": {
     "packageJson": {
       "dependencies": [
-        "npm:@hcaptcha/react-hcaptcha@^2.0.2",
         "npm:@netlify/functions@^5.1.5",
+        "npm:@netlify/identity@^1.2.0",
         "npm:@netlify/neon@~0.1.2",
         "npm:@types/netlify-identity-widget@^1.9.7",
         "npm:@types/node@20",

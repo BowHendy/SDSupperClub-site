@@ -3,6 +3,7 @@ import { requireAdmin } from "./lib/admin";
 import { sql } from "./lib/db";
 import { inviteIdentityUser } from "./lib/netlify-identity-admin";
 import { sendEmail } from "./lib/email";
+import { buildWelcomeEmail } from "./lib/email-templates";
 
 const jsonHeaders = { "Content-Type": "application/json" };
 
@@ -20,12 +21,12 @@ export const handler: Handler = async (event, context) => {
     }
 
     const rows = await sql`
-      SELECT id, email, status
+      SELECT id, name, email, status
       FROM invitation_requests
       WHERE id = ${requestId}
       LIMIT 1
     `;
-    const req = rows[0] as { id: string; email: string; status: string } | undefined;
+    const req = rows[0] as { id: string; name: string | null; email: string; status: string } | undefined;
     if (!req) {
       return { statusCode: 404, headers: jsonHeaders, body: JSON.stringify({ error: "Not found" }) };
     }
@@ -47,17 +48,12 @@ export const handler: Handler = async (event, context) => {
 
     // Optional helper email so the user knows to look for Netlify's invite email.
     try {
+      const welcome = buildWelcomeEmail(req.name);
       await sendEmail({
         to: req.email,
-        subject: "SDSupperClub — approved",
-        text: [
-          "You’ve been approved to join SDSupperClub.",
-          "",
-          "Next, watch for a separate invitation email (Netlify Identity) that contains your secure signup link.",
-          "Once you accept the invite, you’ll set your password straight away and can log in.",
-          "",
-          "If you don’t see the invite email within a few minutes, check your spam folder.",
-        ].join("\n"),
+        subject: welcome.subject,
+        text: welcome.text,
+        html: welcome.html,
       });
     } catch (e) {
       // Don’t fail approval if the helper email fails; the Identity invite is the main action.

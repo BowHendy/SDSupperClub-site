@@ -64,7 +64,7 @@ export async function createCheckoutSession(params: {
   body.set("cancel_url", params.cancelUrl);
   body.set("line_items[0][price_data][currency]", "usd");
   body.set("line_items[0][price_data][unit_amount]", String(params.amountCents));
-  body.set("line_items[0][price_data][product_data][name]", "SD Supper Club seat");
+  body.set("line_items[0][price_data][product_data][name]", "Supper Collective seat");
   body.set("line_items[0][quantity]", "1");
   for (const [k, v] of Object.entries(params.metadata)) {
     body.set(`metadata[${k}]`, v);

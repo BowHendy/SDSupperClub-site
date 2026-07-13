@@ -5,3 +5,6 @@
 
 [functions]
   node_bundler = "esbuild"
+
+[functions."scheduled-milestone-check"]
+  schedule = "0 8 * * *"

@@ -1,5 +1,7 @@
 import type { Handler } from "@netlify/functions";
 import { getNetlifyUser, getOrCreateAppUser } from "./lib/auth";
+import { getApprovedHostForMember } from "./lib/host";
+import { hostHasActiveLiveMeal } from "./lib/meal";
 import { sql } from "./lib/db";
 
 const jsonHeaders = { "Content-Type": "application/json" };
@@ -22,20 +24,27 @@ export const handler: Handler = async (event, context) => {
     }
 
     const appUser = await getOrCreateAppUser(netlifyUser);
-    if (!appUser.is_member_approved) {
-      return { statusCode: 403, headers: jsonHeaders, body: JSON.stringify({ error: "Member is not approved yet" }) };
+
+    // G4: hosts cannot RSVP elsewhere while hosting a live meal.
+    const host = await getApprovedHostForMember(appUser.id);
+    if (host) {
+      const mealRows = await sql`SELECT host_id FROM dinners WHERE id = ${mealId} LIMIT 1`;
+      const targetHostId = (mealRows[0] as { host_id: string | null } | undefined)?.host_id;
+      if (targetHostId !== host.id && (await hostHasActiveLiveMeal(host.id))) {
+        return {
+          statusCode: 403,
+          headers: jsonHeaders,
+          body: JSON.stringify({ error: "Cannot request a seat while you are hosting an active meal" }),
+        };
+      }
     }
 
     const mealRows = await sql`
-      SELECT id, status, max_seats FROM dinners WHERE id = ${mealId} LIMIT 1
+      SELECT id, status, max_seats, is_visible FROM dinners WHERE id = ${mealId} LIMIT 1
     `;
-    const meal = mealRows[0] as { id: string; status: string; max_seats: number } | undefined;
+    const meal = mealRows[0] as { id: string; status: string; max_seats: number; is_visible: boolean } | undefined;
 
-    if (!meal) {
-      return { statusCode: 404, headers: jsonHeaders, body: JSON.stringify({ error: "Meal not found" }) };
-    }
-
-    if (meal.status !== "live") {
+    if (!meal || !meal.is_visible || meal.status !== "live") {
       return {
         statusCode: 400,
         headers: jsonHeaders,
@@ -45,7 +54,7 @@ export const handler: Handler = async (event, context) => {
 
     const countRows = await sql`
       SELECT count(*)::int AS c FROM dinner_guests
-      WHERE dinner_id = ${mealId} AND status IN ('paid', 'confirmed')
+      WHERE dinner_id = ${mealId} AND status IN ('paid', 'confirmed', 'attended')
     `;
     const taken = (countRows[0] as { c: number } | undefined)?.c ?? 0;
     if (taken >= meal.max_seats) {
@@ -55,7 +64,7 @@ export const handler: Handler = async (event, context) => {
     await sql`
       INSERT INTO dinner_guests (dinner_id, member_id, status)
       VALUES (${mealId}, ${appUser.id}, 'waitlisted')
-      ON CONFLICT (dinner_id, member_id) DO UPDATE SET status = EXCLUDED.status
+      ON CONFLICT (dinner_id, member_id) DO UPDATE SET status = 'waitlisted'
     `;
 
     return { statusCode: 200, headers: jsonHeaders, body: JSON.stringify({ ok: true }) };

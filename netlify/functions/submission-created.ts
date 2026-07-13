@@ -1,6 +1,7 @@
 import type { Handler } from "@netlify/functions";
 import { sql } from "./lib/db";
 import { sendEmail } from "./lib/email";
+import { getAdminNotificationEmails } from "./lib/admin-notifications";
 
 const jsonHeaders = { "Content-Type": "application/json" };
 const INVITE_FORM_NAME = "invite-request";
@@ -136,9 +137,9 @@ export const handler: Handler = async (event) => {
       )
     `;
 
-    const adminTo = process.env.ADMIN_NOTIFICATION_EMAIL ?? null;
-    if (!adminTo) {
-      console.log("submission-created: no ADMIN_NOTIFICATION_EMAIL; skipping admin email");
+    const adminRecipients = getAdminNotificationEmails();
+    if (adminRecipients.length === 0) {
+      console.log("submission-created: no ADMIN_NOTIFICATION_EMAILS or ADMIN_NOTIFICATION_EMAIL; skipping admin email");
       return { statusCode: 200, headers: jsonHeaders, body: JSON.stringify({ ok: true }) };
     }
 
@@ -146,26 +147,30 @@ export const handler: Handler = async (event) => {
     const loginUrl = siteUrl ? `${siteUrl}/login/` : "/login/";
     const adminUrl = siteUrl ? `${siteUrl}/admin/` : "/admin/";
 
-    try {
-      await sendEmail({
-        to: adminTo,
-        subject: "SDSupperClub — new membership request",
-        text: [
-          "A new membership request was submitted (Netlify Forms).",
-          "",
-          `Name: ${name ?? "(not provided)"}`,
-          `Email: ${email}`,
-          `Referred by: ${referredBy ?? "(not provided)"}`,
-          "",
-          "Why:",
-          why,
-          "",
-          `Login: ${loginUrl}`,
-          `Admin dashboard: ${adminUrl}`,
-        ].join("\n"),
-      });
-    } catch (e) {
-      console.error("submission-created: failed sending admin email", e);
+    const notificationText = [
+      "A new membership request was submitted (Netlify Forms).",
+      "",
+      `Name: ${name ?? "(not provided)"}`,
+      `Email: ${email}`,
+      `Referred by: ${referredBy ?? "(not provided)"}`,
+      "",
+      "Why:",
+      why,
+      "",
+      `Login: ${loginUrl}`,
+      `Admin dashboard: ${adminUrl}`,
+    ].join("\n");
+
+    for (const adminTo of adminRecipients) {
+      try {
+        await sendEmail({
+          to: adminTo,
+          subject: "Supper Collective — new membership request",
+          text: notificationText,
+        });
+      } catch (e) {
+        console.error("submission-created: failed sending admin email", { adminTo, error: e });
+      }
     }
 
     return { statusCode: 200, headers: jsonHeaders, body: JSON.stringify({ ok: true }) };
