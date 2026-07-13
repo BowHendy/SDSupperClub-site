@@ -47,10 +47,10 @@ export function Navigation() {
         </ul>
 
         <Link
-          href="/#calendar"
+          href="/#request-invite"
           className="rounded border border-foreground/60 px-4 py-2 text-body-sm text-foreground transition-all duration-300 hover:border-foreground hover:bg-foreground hover:text-background"
         >
-          Request a seat
+          Request to join
         </Link>
       </nav>
     </header>

@@ -45,6 +45,7 @@ create table if not exists public.invitation_requests (
   email text not null,
   referred_by text,
   why_you_love_to_come text not null,
+  birth_year int,
 
   status text not null default 'pending'
     check (status in ('pending', 'approved', 'rejected')),

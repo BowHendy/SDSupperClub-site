@@ -109,6 +109,7 @@ export const handler: Handler = async (event) => {
     const email = field(data, "email");
     const referredBy = field(data, "referredBy", "referred_by");
     const why = field(data, "why");
+    const birthYear = field(data, "birthYear", "birth_year");
 
     if (!email || !why) {
       console.error("submission-created: invite-request missing email or why", {
@@ -124,6 +125,7 @@ export const handler: Handler = async (event) => {
         email,
         referred_by,
         why_you_love_to_come,
+        birth_year,
         status,
         source
       )
@@ -132,6 +134,7 @@ export const handler: Handler = async (event) => {
         ${email},
         ${referredBy},
         ${why},
+        ${birthYear ? parseInt(birthYear, 10) : null},
         'pending',
         'netlify-forms'
       )
@@ -152,6 +155,7 @@ export const handler: Handler = async (event) => {
       "",
       `Name: ${name ?? "(not provided)"}`,
       `Email: ${email}`,
+      `Birth year: ${birthYear ?? "(not provided)"}`,
       `Referred by: ${referredBy ?? "(not provided)"}`,
       "",
       "Why:",

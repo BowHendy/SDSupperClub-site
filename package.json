@@ -10,6 +10,7 @@
     "lint": "next lint",
     "db:verify": "node scripts/verify-netlify-db.mjs",
     "db:apply-schema": "node scripts/apply-netlify-schema.mjs",
+    "db:migrate": "node scripts/apply-migration.mjs",
     "db:seed-admins": "node scripts/seed-admins.mjs",
     "health": "node scripts/check-site-health.mjs",
     "verify:migration": "node scripts/verify-domain-migration.mjs"

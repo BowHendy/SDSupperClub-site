@@ -4,7 +4,7 @@ import type { SiteContent } from "./site-content-types";
 export const defaultSiteContent: SiteContent = {
   hero: {
     headline: "Ten seats. One chef. Someone's home. Once a month.",
-    cta: "Request an Invitation",
+    cta: "Request to Join",
   },
   experience: {
     title: "Good food. Good people. One night a month.",
@@ -25,8 +25,8 @@ export const defaultSiteContent: SiteContent = {
   membership: {
     title: "How to Join",
     intro:
-      "You join by being invited by a current member. Guests can invite one new person per dinner. If you'd like to be considered, tell us a bit about yourself below.",
-    formTitle: "Request an Invitation",
+      "Request to join below. Every application is reviewed by our team. Once approved, you can create your account and request seats at upcoming dinners.",
+    formTitle: "Request to Join",
   },
   contact: {
     instagram: "https://instagram.com/sdsupperclub",

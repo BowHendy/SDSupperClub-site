@@ -2,6 +2,7 @@
 
 import { useSiteContent } from "@/components/providers/SiteContentProvider";
 import { FadeIn } from "@/components/ui/FadeIn";
+import { InviteForm } from "@/components/ui/InviteForm";
 
 export function Membership() {
   const { site } = useSiteContent();
@@ -22,17 +23,16 @@ export function Membership() {
             {m.intro}
           </p>
         </FadeIn>
+        <span id="request-invite" className="scroll-mt-24" aria-hidden />
         <FadeIn delay={0.2}>
-          <h3 className="mt-12 font-cormorant text-xl text-foreground">Live dinners</h3>
-          <p className="mt-4 font-geist text-body-md text-foreground/80">
-            Browse upcoming dinners in the calendar below and request a seat — you&apos;ll receive an email to create
-            your password and join the waitlist.
+          <h3 className="mt-12 font-cormorant text-xl text-foreground">{m.formTitle}</h3>
+          <p className="mt-3 font-geist text-body-sm text-foreground/70">
+            Complete this form to ask to join the community. An admin will review your application
+            before you can register and request seats at upcoming dinners.
           </p>
-          <p className="mt-4">
-            <a href="#calendar" className="font-geist text-body-sm text-brass underline">
-              Go to calendar →
-            </a>
-          </p>
+          <div className="mt-8">
+            <InviteForm />
+          </div>
         </FadeIn>
       </div>
     </section>

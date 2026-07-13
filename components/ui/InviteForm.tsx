@@ -3,13 +3,19 @@
 import { useForm } from "react-hook-form";
 import { type BaseSyntheticEvent, useState } from "react";
 import { Button } from "./Button";
+import { birthYearOptions, isAtLeast21 } from "@/lib/age";
 
 type InviteFormData = {
   name: string;
   email: string;
+  birthYear: string;
   referredBy: string;
   why: string;
 };
+
+const BIRTH_YEARS = birthYearOptions();
+const UNDER_21_MESSAGE =
+  "Supper Collective is not available to those under 21.";
 
 export function InviteForm() {
   const [status, setStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
@@ -17,19 +23,27 @@ export function InviteForm() {
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
     reset,
-  } = useForm<InviteFormData>();
+  } = useForm<InviteFormData>({
+    defaultValues: { birthYear: "" },
+  });
+
+  const birthYearValue = watch("birthYear");
+  const birthYearNum = birthYearValue ? parseInt(birthYearValue, 10) : NaN;
+  const hasBirthYear = birthYearValue !== "" && !Number.isNaN(birthYearNum);
+  const isOver21 = hasBirthYear && isAtLeast21(birthYearNum);
+  const isUnder21 = hasBirthYear && !isAtLeast21(birthYearNum);
 
   const onSubmit = async (_data: InviteFormData, e?: BaseSyntheticEvent) => {
+    if (!isOver21) return;
     setErrorReason(null);
     setStatus("sending");
     try {
       const formEl = e?.target as HTMLFormElement | undefined;
       const formData = new FormData(formEl);
       formData.set("form-name", "invite-request");
-      // Netlify Forms AJAX: body must be URL-encoded (not multipart FormData).
-      // @see https://docs.netlify.com/forms/setup/#submit-javascript-rendered-forms-with-ajax
       const encoded = new URLSearchParams();
       formData.forEach((value, key) => {
         encoded.append(key, typeof value === "string" ? value : String(value));
@@ -55,7 +69,7 @@ export function InviteForm() {
   if (status === "success") {
     return (
       <p className="font-geist text-body-lg text-foreground/90">
-        Thank you. We&apos;ll be in touch.
+        Thank you. We&apos;ll review your request and be in touch.
       </p>
     );
   }
@@ -70,7 +84,6 @@ export function InviteForm() {
       className="mx-auto max-w-xl space-y-6"
     >
       <input type="hidden" name="form-name" value="invite-request" />
-      {/* Honeypot: hidden from users, catches spam bots */}
       <p className="hidden" aria-hidden="true">
         <input name="bot-field" tabIndex={-1} autoComplete="off" />
       </p>
@@ -105,6 +118,34 @@ export function InviteForm() {
         )}
       </div>
       <div>
+        <label htmlFor="birthYear" className="mb-1 block font-geist text-body-sm text-foreground/80">
+          Birth year
+        </label>
+        <select
+          id="birthYear"
+          {...register("birthYear", { required: "Birth year is required" })}
+          className="w-full rounded border border-white/20 bg-charcoal px-4 py-3 font-geist text-foreground focus:border-brass focus:outline-none"
+          defaultValue=""
+        >
+          <option value="" disabled>
+            Select year
+          </option>
+          {BIRTH_YEARS.map((year) => (
+            <option key={year} value={String(year)}>
+              {year}
+            </option>
+          ))}
+        </select>
+        {errors.birthYear && (
+          <p className="mt-1 text-body-sm text-terracotta">{errors.birthYear.message}</p>
+        )}
+        {isUnder21 && (
+          <p className="mt-2 text-body-sm text-terracotta" role="alert">
+            {UNDER_21_MESSAGE}
+          </p>
+        )}
+      </div>
+      <div>
         <label htmlFor="referredBy" className="mb-1 block font-geist text-body-sm text-foreground/80">
           Who referred you?
         </label>
@@ -136,7 +177,7 @@ export function InviteForm() {
           Something went wrong sending your request. Please try again, or email us directly.
         </p>
       )}
-      <Button type="submit" disabled={status === "sending"}>
+      <Button type="submit" disabled={status === "sending" || !isOver21}>
         {status === "sending" ? "Sending…" : "Submit"}
       </Button>
     </form>
