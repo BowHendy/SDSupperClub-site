@@ -1,14 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { acceptInvite, recoverPassword } from "@netlify/identity";
+import { acceptInvite, AuthError, recoverPassword } from "@netlify/identity";
 import type { PasswordFlowType } from "@/lib/netlify-identity-auth-hash";
 import {
   allPasswordRequirementsMet,
   getPasswordRequirementState,
   PASSPHRASE_TIP,
 } from "@/lib/password-requirements";
-import { initNetlifyIdentity, loadNetlifyIdentity } from "@/lib/netlify-identity";
 
 const FIELD_CLASS =
   "w-full rounded border border-white/20 bg-transparent px-4 py-3 font-geist text-foreground placeholder:text-foreground/40 focus:border-brass focus:outline-none";
@@ -20,17 +19,25 @@ type CreatePasswordFormProps = {
   onCancel: () => void;
 };
 
+function formatPasswordFlowError(error: unknown, flow: PasswordFlowType): string {
+  const message = error instanceof Error ? error.message : "";
+  const status = error instanceof AuthError ? error.status : undefined;
+
+  if (flow === "invite" && (/user not found/i.test(message) || status === 404)) {
+    return "This invite link is no longer valid — it may already have been used. Cancel below and try signing in with your email and password. If that does not work, ask an admin to send a new invite.";
+  }
+  if (flow === "recovery" && (/user not found/i.test(message) || status === 404)) {
+    return "This recovery link is no longer valid. Request a new password reset from the sign-in page.";
+  }
+  if (message) return message;
+  return "Could not create password. Please try again.";
+}
+
 async function completePasswordFlow(flow: PasswordFlowType, token: string, password: string): Promise<void> {
   if (flow === "invite") {
     await acceptInvite(token, password);
   } else {
     await recoverPassword(token, password);
-  }
-
-  await initNetlifyIdentity();
-  const ni = await loadNetlifyIdentity();
-  if (typeof ni.refresh === "function") {
-    await ni.refresh();
   }
 }
 
@@ -59,8 +66,7 @@ export function CreatePasswordForm({ flow, token, onSuccess, onCancel }: CreateP
       await completePasswordFlow(flow, token, password);
       onSuccess();
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Could not create password. Please try again.";
-      setError(message);
+      setError(formatPasswordFlowError(e, flow));
     } finally {
       setBusy(false);
     }

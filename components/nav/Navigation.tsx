@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { isSignedIn, subscribeAuthChange } from "@/lib/auth-session";
 
 const NAV_LINKS = [
   { href: "/#experience", label: "Experience" },
@@ -12,11 +13,29 @@ const NAV_LINKS = [
 
 export function Navigation() {
   const [scrolled, setScrolled] = useState(false);
+  const [signedIn, setSignedIn] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 80);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const ok = await isSignedIn();
+      if (!cancelled) {
+        setSignedIn(ok);
+        setAuthChecked(true);
+      }
+    })();
+    const unsub = subscribeAuthChange((ok) => setSignedIn(ok));
+    return () => {
+      cancelled = true;
+      unsub();
+    };
   }, []);
 
   return (
@@ -46,12 +65,30 @@ export function Navigation() {
           ))}
         </ul>
 
-        <Link
-          href="/#request-invite"
-          className="rounded border border-foreground/60 px-4 py-2 text-body-sm text-foreground transition-all duration-300 hover:border-foreground hover:bg-foreground hover:text-background"
-        >
-          Request to join
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/#request-invite"
+            className="rounded border border-foreground/60 px-4 py-2 text-body-sm text-foreground transition-all duration-300 hover:border-foreground hover:bg-foreground hover:text-background"
+          >
+            Request to join
+          </Link>
+          {authChecked &&
+            (signedIn ? (
+              <Link
+                href="/members/"
+                className="rounded border border-transparent px-4 py-2 text-body-sm text-foreground/90 transition-colors hover:text-foreground"
+              >
+                My account
+              </Link>
+            ) : (
+              <Link
+                href="/login/"
+                className="rounded border border-foreground/60 px-4 py-2 text-body-sm text-foreground transition-all duration-300 hover:border-foreground hover:bg-foreground hover:text-background"
+              >
+                Sign in
+              </Link>
+            ))}
+        </div>
       </nav>
     </header>
   );

@@ -8,6 +8,8 @@ import { netlifyFunctionUrl } from "@/lib/netlify-paths";
 type FormData = {
   name: string;
   email: string;
+  /** Honeypot — must stay empty. */
+  company?: string;
 };
 
 type Props = {
@@ -27,7 +29,12 @@ export function MealRequestForm({ dinnerId, dinnerLabel }: Props) {
       const res = await fetch(netlifyFunctionUrl("request-meal-seat"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: data.email, name: data.name, dinnerId }),
+        body: JSON.stringify({
+          email: data.email,
+          name: data.name,
+          dinnerId,
+          company: data.company,
+        }),
       });
       const json = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(json.error ?? "Request failed");
@@ -49,7 +56,17 @@ export function MealRequestForm({ dinnerId, dinnerLabel }: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="mx-auto max-w-xl space-y-6">
+    <form onSubmit={handleSubmit(onSubmit)} className="relative mx-auto max-w-xl space-y-6">
+      <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden opacity-0">
+        <label htmlFor="meal-company">Company</label>
+        <input
+          id="meal-company"
+          type="text"
+          tabIndex={-1}
+          autoComplete="off"
+          {...register("company")}
+        />
+      </div>
       <div>
         <label htmlFor="meal-name" className="mb-1 block font-geist text-body-sm text-foreground/80">
           Name

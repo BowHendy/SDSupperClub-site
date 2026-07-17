@@ -109,7 +109,7 @@ if (fs.existsSync(formsHtml)) {
   const hasInviteForm = html.includes('name="invite-request"');
   console.log(ok("public/__forms.html exists"));
   console.log(hasInviteForm ? ok('invite-request form skeleton present') : fail('invite-request form skeleton missing'));
-  console.log("  → submission-created function must be wired in Netlify UI (Forms → invite-request → submission-created)");
+  console.log("  → Wire Forms → invite-request → submission-created in Netlify UI; use honeypot, not puzzle CAPTCHA");
 } else {
   console.log(fail("public/__forms.html missing", "Netlify may not detect invite-request form at build time"));
 }

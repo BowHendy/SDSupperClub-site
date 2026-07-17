@@ -1,7 +1,7 @@
 import type { Handler } from "@netlify/functions";
 import { getNetlifyUser, getOrCreateAppUser } from "./lib/auth";
 import { sql } from "./lib/db";
-import { createCheckoutSession, recordPayment, stripeEnabled } from "./lib/stripe";
+import { createCheckoutSession, recordPayment, requirePaymentsReady } from "./lib/stripe";
 
 const jsonHeaders = { "Content-Type": "application/json" };
 
@@ -57,11 +57,12 @@ export const handler: Handler = async (event, context) => {
     const total = price + fee;
     const siteUrl = process.env.URL ?? process.env.DEPLOY_PRIME_URL ?? "http://localhost:8888";
 
-    if (!stripeEnabled()) {
+    const payments = requirePaymentsReady();
+    if (!payments.ok) {
       return {
-        statusCode: 200,
+        statusCode: payments.status,
         headers: jsonHeaders,
-        body: JSON.stringify({ ok: true, mode: "demo", amount: total }),
+        body: JSON.stringify({ error: payments.error }),
       };
     }
 
@@ -74,7 +75,7 @@ export const handler: Handler = async (event, context) => {
     });
 
     if (!checkout.ok) {
-      return { statusCode: 500, headers: jsonHeaders, body: JSON.stringify({ error: checkout.error }) };
+      return { statusCode: 503, headers: jsonHeaders, body: JSON.stringify({ error: checkout.error }) };
     }
     if (checkout.mode === "demo") {
       return { statusCode: 200, headers: jsonHeaders, body: JSON.stringify({ ok: true, mode: "demo", amount: total }) };

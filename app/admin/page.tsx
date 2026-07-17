@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { initNetlifyIdentity, loadNetlifyIdentity } from "@/lib/netlify-identity";
+import { getUser } from "@netlify/identity";
+import { signOut, subscribeAuthChange } from "@/lib/auth-session";
 import { fetchAuthed } from "@/lib/netlify-api";
 import { netlifyFunctionUrl } from "@/lib/netlify-paths";
 
@@ -55,8 +56,16 @@ type ChefApplication = {
   created_at: string;
 };
 
-type Tab = "applications" | "meals" | "funds" | "disputes" | "invitations";
+type Tab = "invitations" | "applications" | "meals" | "funds" | "disputes";
 type StatusFilter = "pending" | "approved" | "rejected" | "all";
+
+const ADMIN_TABS: { id: Tab; label: string }[] = [
+  { id: "invitations", label: "New Guests" },
+  { id: "applications", label: "Applications" },
+  { id: "meals", label: "Meals" },
+  { id: "funds", label: "Fees" },
+  { id: "disputes", label: "Disputes" },
+];
 
 export default function AdminPage() {
   const router = useRouter();
@@ -67,7 +76,6 @@ export default function AdminPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  // Invitations (legacy).
   const [requests, setRequests] = useState<InvitationRequest[]>([]);
   const [filter, setFilter] = useState<StatusFilter>("pending");
   const [rejectNote, setRejectNote] = useState<Record<string, string>>({});
@@ -92,12 +100,16 @@ export default function AdminPage() {
   const loadRequests = useCallback(async () => {
     setLoadError(null);
     try {
-      const ni = await loadNetlifyIdentity();
-      await ni.currentUser()?.jwt(true);
       const qs = filter === "all" ? "" : `?status=${encodeURIComponent(filter)}`;
       const res = await fetchAuthed(netlifyFunctionUrl(`admin-list-invitation-requests${qs}`));
       const json = (await res.json()) as { ok?: boolean; requests?: InvitationRequest[]; error?: string };
-      if (!res.ok) throw new Error(json.error ?? res.statusText);
+      if (!res.ok) {
+        const detail =
+          typeof json === "object" && json && "detail" in json
+            ? String((json as { detail?: unknown }).detail)
+            : "";
+        throw new Error(detail || (json.error ?? res.statusText));
+      }
       setRequests(json.requests ?? []);
     } catch (e) {
       setRequests([]);
@@ -108,8 +120,6 @@ export default function AdminPage() {
   const loadApplications = useCallback(async () => {
     setLoadError(null);
     try {
-      const ni = await loadNetlifyIdentity();
-      await ni.currentUser()?.jwt(true);
       const res = await fetchAuthed(
         netlifyFunctionUrl(`admin-list-applications?status=${encodeURIComponent(appStatus)}`),
       );
@@ -119,7 +129,15 @@ export default function AdminPage() {
         chefs?: ChefApplication[];
         error?: string;
       };
-      if (!res.ok) throw new Error(json.error ?? res.statusText);
+      if (!res.ok) {
+        const detail =
+          typeof json === "object" && json && "detail" in json
+            ? String((json as { detail?: unknown }).detail)
+            : "";
+        throw new Error(
+          detail || (json.error ?? res.statusText),
+        );
+      }
       setHosts(json.hosts ?? []);
       setChefs(json.chefs ?? []);
     } catch (e) {
@@ -138,7 +156,15 @@ export default function AdminPage() {
         disputes?: Record<string, unknown>[];
         error?: string;
       };
-      if (!res.ok) throw new Error(json.error ?? res.statusText);
+      if (!res.ok) {
+        const detail =
+          typeof json === "object" && json && "detail" in json
+            ? String((json as { detail?: unknown }).detail)
+            : "";
+        throw new Error(
+          detail || (json.error ?? res.statusText),
+        );
+      }
       setAdminMeals(json.meals ?? []);
       setOpenDisputes(json.disputes ?? []);
     } catch (e) {
@@ -154,7 +180,15 @@ export default function AdminPage() {
         settings?: { attendance_fee_enabled: boolean; attendance_fee_amount: number };
         error?: string;
       };
-      if (!res.ok) throw new Error(json.error ?? res.statusText);
+      if (!res.ok) {
+        const detail =
+          typeof json === "object" && json && "detail" in json
+            ? String((json as { detail?: unknown }).detail)
+            : "";
+        throw new Error(
+          detail || (json.error ?? res.statusText),
+        );
+      }
       if (json.settings) {
         setFeeEnabled(json.settings.attendance_fee_enabled);
         setFeeAmount(String(json.settings.attendance_fee_amount));
@@ -186,23 +220,22 @@ export default function AdminPage() {
 
   useEffect(() => {
     let cancelled = false;
-    let offLogout: (() => void) | undefined;
+    let offAuth: (() => void) | undefined;
 
     (async () => {
       try {
-        await initNetlifyIdentity();
+        const user = await getUser();
         if (cancelled) return;
-        const ni = await loadNetlifyIdentity();
-        if (cancelled) return;
-        if (!ni.currentUser()) {
+        if (!user) {
           router.replace("/login/");
           return;
         }
-        ni.on("logout", () => router.replace("/login/"));
-        offLogout = () => ni.off("logout", () => router.replace("/login/"));
+        offAuth = subscribeAuthChange((signedIn) => {
+          if (!signedIn) router.replace("/login/");
+        });
         setIdentityReady(true);
       } catch {
-        // Avoid fetching admin data when auth failed.
+        router.replace("/login/");
       } finally {
         if (!cancelled) setMounted(true);
       }
@@ -210,7 +243,7 @@ export default function AdminPage() {
 
     return () => {
       cancelled = true;
-      offLogout?.();
+      offAuth?.();
     };
   }, [router]);
 
@@ -223,8 +256,7 @@ export default function AdminPage() {
   }, [identityReady, tab, loadRequests, loadApplications, loadMealsAdmin, loadSettings]);
 
   const logout = async () => {
-    const ni = await loadNetlifyIdentity();
-    await ni.logout();
+    await signOut();
     router.replace("/login/");
   };
 
@@ -352,23 +384,23 @@ export default function AdminPage() {
 
         <h1 className="mt-16 font-cormorant text-display-sm font-medium text-foreground">Admin</h1>
         <p className="mt-2 font-geist text-body-sm text-foreground/70">
-          Review host and chef applications, and legacy membership invitations.
+          Review new guest requests, host and chef applications, meals, and disputes.
         </p>
 
         <div className="mt-8 flex flex-wrap gap-3 border-b border-white/10">
-          {(["applications", "meals", "funds", "disputes", "invitations"] as const).map((t) => (
+          {ADMIN_TABS.map(({ id, label }) => (
             <button
-              key={t}
+              key={id}
               type="button"
-              onClick={() => setTab(t)}
+              onClick={() => setTab(id)}
               className={[
-                "-mb-px border-b-2 px-2 py-3 font-geist text-body-sm capitalize transition-colors",
-                tab === t
+                "-mb-px border-b-2 px-2 py-3 font-geist text-body-sm transition-colors",
+                tab === id
                   ? "border-brass text-brass"
                   : "border-transparent text-foreground/60 hover:text-foreground",
               ].join(" ")}
             >
-              {t}
+              {label}
             </button>
           ))}
         </div>

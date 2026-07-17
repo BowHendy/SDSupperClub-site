@@ -2,6 +2,7 @@ import type { Handler } from "@netlify/functions";
 import { sql } from "./lib/db";
 import { sendEmail } from "./lib/email";
 import { getAdminNotificationEmails } from "./lib/admin-notifications";
+import { isAtLeast21 } from "./lib/age";
 
 const jsonHeaders = { "Content-Type": "application/json" };
 const INVITE_FORM_NAME = "invite-request";
@@ -119,6 +120,16 @@ export const handler: Handler = async (event) => {
       return { statusCode: 200, headers: jsonHeaders, body: JSON.stringify({ ok: false }) };
     }
 
+    const birthYearNum = birthYear ? Number.parseInt(birthYear, 10) : NaN;
+    if (!Number.isFinite(birthYearNum) || !isAtLeast21(birthYearNum)) {
+      console.warn("submission-created: rejected under-21 or missing birth year", { email, birthYear });
+      return {
+        statusCode: 200,
+        headers: jsonHeaders,
+        body: JSON.stringify({ ok: false, error: "Must be 21 or older" }),
+      };
+    }
+
     await sql`
       INSERT INTO invitation_requests (
         name,
@@ -134,7 +145,7 @@ export const handler: Handler = async (event) => {
         ${email},
         ${referredBy},
         ${why},
-        ${birthYear ? parseInt(birthYear, 10) : null},
+        ${birthYearNum},
         'pending',
         'netlify-forms'
       )

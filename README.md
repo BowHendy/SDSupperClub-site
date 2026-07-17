@@ -72,16 +72,17 @@ Do these after Neon / Netlify DB is created for the site (code already expects `
 
 1. **Rotate DB credentials if they were ever exposed** (chat, screenshot, ticket): Neon console → reset password for the DB role → copy the new connection string → **Netlify → Environment variables → `NETLIFY_DATABASE_URL`** → save → **redeploy**. Never commit the URL or password to git.
 2. **Verify env in Netlify:** **Site configuration → Environment variables** → confirm **`NETLIFY_DATABASE_URL`** exists for **Production** (and **Deploy previews** if previews should use the DB). For a quick local check: same variable in `.env.local`, then `npm run db:verify`.
-3. **Apply schema:** Run [`netlify/db/schema.sql`](netlify/db/schema.sql) in Neon’s SQL editor, or locally `npm run db:apply-schema` with `NETLIFY_DATABASE_URL` set. If the DB already existed, run [`netlify/db/migration_content.sql`](netlify/db/migration_content.sql) once, then optional [`netlify/db/seed-content.sql`](netlify/db/seed-content.sql).
+3. **Apply schema:** Run [`netlify/db/schema.sql`](netlify/db/schema.sql) in Neon’s SQL editor, or locally `npm run db:apply-schema` with `NETLIFY_DATABASE_URL` set. If the DB already existed, run [`netlify/db/migration_content.sql`](netlify/db/migration_content.sql) once, then optional [`netlify/db/seed-content.sql`](netlify/db/seed-content.sql). For nearest-meal calendar fields, also run [`netlify/db/migrate-dinner-geo.sql`](netlify/db/migrate-dinner-geo.sql) once (`hosts.zip`, `dinners.zip` / lat / lng).
 4. **Claim Neon** (long-term): **Extensions → Neon → Connect / Claim** so the instance is not removed after the unclaimed trial period ([docs](https://docs.netlify.com/netlify-db/)).
 5. **Domain rebrand (production):** Run [`netlify/db/migrate-rebrand-site-content.sql`](netlify/db/migrate-rebrand-site-content.sql) in Neon after deploy; follow [`docs/domain-migration-runbook.md`](docs/domain-migration-runbook.md) and run `npm run verify:migration`.
-6. **Trace “signup” issues:** There are two paths:
-  - **Marketing “request invite” form** ([`components/ui/InviteForm.tsx`](components/ui/InviteForm.tsx)): uses **Netlify Forms** with **Netlify-provided reCAPTCHA**. Verified submissions trigger **[`submission-created`](netlify/functions/submission-created.ts)** (event function), which inserts a row into **`invitation_requests`** (for `/admin` APIs) and sends the admin email when Resend env vars are set. If the form fails in the browser, check **Netlify → Forms → invite-request** and confirm reCAPTCHA is enabled under Forms spam protection. If the form succeeds in the UI but nothing appears in the admin list or logs, check **Netlify → Functions → `submission-created` → Logs** (typical causes: missing `NETLIFY_DATABASE_URL`, or schema not applied).
-  - **Member account (Identity invite accepted):** Netlify Identity calls **`identity-signup`** → writes to **`users`**. If that fails, open **Netlify → Functions → `identity-signup` → Logs** (typical causes: missing `NETLIFY_DATABASE_URL`, or schema not applied → `relation "users" does not exist`).
+6. **Trace “signup” issues:** Join-without-meal is the public path:
+  - **Request to join** ([`components/ui/InviteForm.tsx`](components/ui/InviteForm.tsx)): Netlify Forms (`invite-request` + honeypot) → [`submission-created`](netlify/functions/submission-created.ts) inserts `invitation_requests` (server-side 21+ check) and emails admins. Approve from `/admin/` → Identity invite.
+  - **Seat requests:** after login, from guest/member home (`request-attendance`). Public calendar only teases date + ZIP (nearest meal when geolocation is available).
+  - If Identity signup fails, open **Netlify → Functions → `identity-signup` → Logs** (typical causes: missing `NETLIFY_DATABASE_URL`, or schema not applied).
 
 ## Admin notification email (secure setup)
 
-[`request-host`](netlify/functions/request-host.ts) emails the club when a member requests to host. [`submission-created`](netlify/functions/submission-created.ts) can email the same inbox when someone submits the public invite form (after Netlify verifies the submission). Delivery uses [Resend](https://resend.com). The admin inbox and API key exist **only** in the Netlify Functions environment (not in the static site bundle).
+[`request-host`](netlify/functions/request-host.ts) emails the club when a member requests to host. [`submission-created`](netlify/functions/submission-created.ts) can email the same inbox when someone submits the public join form (after Netlify verifies the submission). Delivery uses [Resend](https://resend.com). The admin inbox and API key exist **only** in the Netlify Functions environment (not in the static site bundle).
 
 ### 1. Netlify environment variables
 
@@ -89,7 +90,7 @@ In **Netlify → Site configuration → Environment variables**, add (scopes: at
 
 | Variable | Purpose |
 | -------- | ------- |
-| `ADMIN_NOTIFICATION_EMAIL` | Inbox that receives host-request and new invite-request notifications (e.g. the club admin’s email). |
+| `ADMIN_NOTIFICATION_EMAIL` | Inbox that receives host-request and new join-request notifications. |
 | `RESEND_API_KEY` | Resend API key — treat as a secret; restrict who can view Netlify settings. |
 | `RESEND_FROM_EMAIL` | Verified sender, e.g. `Supper Collective <hello@suppercollective.org>`. |
 

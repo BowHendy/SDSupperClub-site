@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { initNetlifyIdentity, loadNetlifyIdentity } from "@/lib/netlify-identity";
+import { isSignedIn } from "@/lib/auth-session";
 import { fetchAuthed, netlifyFunctionUrl } from "@/lib/netlify-api";
 import { homeForRole, type PrimaryRole } from "@/lib/role-routes";
 
@@ -13,9 +13,7 @@ export default function MembersRedirectPage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      await initNetlifyIdentity();
-      const ni = await loadNetlifyIdentity();
-      if (!ni.currentUser()) {
+      if (!(await isSignedIn())) {
         router.replace("/login/");
         return;
       }

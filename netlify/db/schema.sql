@@ -111,6 +111,7 @@ create table if not exists public.hosts (
   mobile_phone text,
 
   address text not null,
+  zip text,
   allergies text,
 
   -- Kitchen + dining proof photos collected during application.
@@ -178,6 +179,9 @@ create table if not exists public.dinners (
 
   -- Snapshot fields at dinner creation time.
   address text,
+  zip text,
+  latitude double precision,
+  longitude double precision,
   host_name text,
   host_contact text,
 
@@ -248,7 +252,7 @@ create table if not exists public.dinner_guests (
       'waitlisted',  -- requested seat; awaiting host
       'invited',     -- legacy alias for approved
       'approved',    -- host accepted; profile + payment needed
-      'paid',        -- paid; funds in escrow
+      'paid',        -- paid via platform Checkout (ops ledger; not Connect escrow)
       'confirmed',   -- seat locked for dinner
       'attended',    -- showed up (promote guest -> member)
       'rejected',    -- host declined
@@ -270,7 +274,8 @@ create table if not exists public.dinner_guests (
   unique (dinner_id, member_id)
 );
 
--- Payment ledger: incoming guest/host charges held in escrow (Phase 3).
+-- Payment ledger: platform Checkout charges + ops payout records (interim Phase 3).
+-- Not Stripe Connect transfers. Connect account ids on hosts/chefs are reserved for later.
 create table if not exists public.payments (
   id uuid primary key default gen_random_uuid(),
 
@@ -352,6 +357,13 @@ create table if not exists public.meal_seat_requests (
     check (status in ('pending', 'linked', 'cancelled')),
   created_at timestamptz not null default now(),
   unique (dinner_id, email)
+);
+
+-- Abuse controls for public endpoints (e.g. meal seat requests).
+create table if not exists public.rate_limit_buckets (
+  bucket text primary key,
+  hit_count int not null default 0,
+  window_start timestamptz not null default now()
 );
 
 -- Indexes for expected queries.

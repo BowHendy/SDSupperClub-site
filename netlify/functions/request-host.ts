@@ -1,6 +1,7 @@
 import type { Handler } from "@netlify/functions";
 import { getNetlifyUser, getOrCreateAppUser } from "./lib/auth";
 import { sql } from "./lib/db";
+import { normalizeUsZip } from "./lib/geocode";
 
 const jsonHeaders = { "Content-Type": "application/json" };
 
@@ -48,6 +49,7 @@ export const handler: Handler = async (event, context) => {
     const message = (body.message as string | undefined) ?? "";
 
     const address = (body.address as string | undefined) ?? "";
+    const zipRaw = (body.zip as string | undefined) ?? "";
     const mobilePhone = (body.mobilePhone as string | undefined) ?? "";
     const allergies = (body.allergies as string | undefined) ?? "";
     const kitchenPhotoUrl = (body.kitchenPhotoUrl as string | undefined) ?? "";
@@ -59,6 +61,8 @@ export const handler: Handler = async (event, context) => {
     // Full host profile must be complete BEFORE submitting for admin approval.
     const missing: string[] = [];
     if (!address.trim()) missing.push("address");
+    const zip = normalizeUsZip(zipRaw) ?? normalizeUsZip(address);
+    if (!zip) missing.push("zip");
     if (!mobilePhone.trim()) missing.push("mobilePhone");
     if (!kitchenPhotoUrl.trim()) missing.push("kitchenPhotoUrl");
     if (!diningPhotoUrl.trim()) missing.push("diningPhotoUrl");
@@ -118,6 +122,7 @@ export const handler: Handler = async (event, context) => {
         email,
         mobile_phone,
         address,
+        zip,
         allergies,
         kitchen_photo_url,
         dining_photo_url,
@@ -134,6 +139,7 @@ export const handler: Handler = async (event, context) => {
         ${netlifyUser.email ?? null},
         ${mobilePhone || null},
         ${address},
+        ${zip},
         ${allergies || null},
         ${kitchenPhotoUrl},
         ${diningPhotoUrl},
@@ -145,6 +151,7 @@ export const handler: Handler = async (event, context) => {
       )
       ON CONFLICT (member_id) DO UPDATE SET
         address = EXCLUDED.address,
+        zip = EXCLUDED.zip,
         mobile_phone = EXCLUDED.mobile_phone,
         allergies = EXCLUDED.allergies,
         kitchen_photo_url = EXCLUDED.kitchen_photo_url,
@@ -169,6 +176,7 @@ export const handler: Handler = async (event, context) => {
         `Email: ${netlifyUser.email ?? "unknown"}`,
         "",
         `Address:\n${address}`,
+        `ZIP: ${zip}`,
         `Cutlery: ${cutlery}`,
         `Glassware: ${glassware}`,
         `Crockery: ${crockery}`,

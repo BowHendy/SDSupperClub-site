@@ -163,7 +163,7 @@ export function HostWorkspace() {
                 }).then(() => load())}
                 className="rounded border border-brass/60 px-4 py-2 font-geist text-body-sm text-brass"
               >
-                Pay subsidy (demo/Stripe)
+                Pay subsidy
               </button>
             </div>
           </div>

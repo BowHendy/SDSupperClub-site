@@ -1,5 +1,10 @@
 /**
- * Stripe helpers. When STRIPE_SECRET_KEY is unset, functions fall back to demo/stub mode.
+ * Stripe helpers — platform Checkout (interim), not Stripe Connect.
+ *
+ * Collect: Checkout Sessions charge the platform Stripe account.
+ * Ledger: `payments` / `payouts` rows are app bookkeeping for ops (ingredient,
+ * remainder, subsidy). They are not Connect transfers or Stripe escrow.
+ * Demo: opt-in via ALLOW_DEMO_PAYMENTS=true; hard-blocked when CONTEXT=production.
  */
 
 import { createHmac, timingSafeEqual } from "node:crypto";
@@ -12,6 +17,29 @@ export function stripeEnabled(): boolean {
 
 export function stripeWebhookEnabled(): boolean {
   return Boolean(process.env.STRIPE_WEBHOOK_SECRET?.trim());
+}
+
+/** True only when demo fulfillment is explicitly enabled and not production. */
+export function demoPaymentsAllowed(): boolean {
+  if (process.env.ALLOW_DEMO_PAYMENTS?.trim() !== "true") return false;
+  if (process.env.CONTEXT === "production") return false;
+  return true;
+}
+
+export type PaymentsReady =
+  | { ok: true; mode: "stripe" | "demo" }
+  | { ok: false; error: string; status: number };
+
+/** Fail closed unless Stripe is configured or demo mode is explicitly allowed. */
+export function requirePaymentsReady(): PaymentsReady {
+  if (stripeEnabled()) return { ok: true, mode: "stripe" };
+  if (demoPaymentsAllowed()) return { ok: true, mode: "demo" };
+  return {
+    ok: false,
+    status: 503,
+    error:
+      "Payments are not configured. Set STRIPE_SECRET_KEY, or ALLOW_DEMO_PAYMENTS=true for non-production only.",
+  };
 }
 
 export type CheckoutSessionResult =
@@ -52,9 +80,14 @@ export async function createCheckoutSession(params: {
   successUrl: string;
   cancelUrl: string;
 }): Promise<CheckoutSessionResult> {
-  const key = process.env.STRIPE_SECRET_KEY;
+  const key = process.env.STRIPE_SECRET_KEY?.trim();
   if (!key) {
-    return { ok: true, mode: "demo" };
+    if (demoPaymentsAllowed()) return { ok: true, mode: "demo" };
+    return {
+      ok: false,
+      error:
+        "Payments are not configured. Set STRIPE_SECRET_KEY, or ALLOW_DEMO_PAYMENTS=true for non-production only.",
+    };
   }
 
   const body = new URLSearchParams();

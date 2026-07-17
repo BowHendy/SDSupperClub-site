@@ -3,6 +3,7 @@ import { getNetlifyUser, getOrCreateAppUser } from "./lib/auth";
 import { getApprovedHostForMember } from "./lib/host";
 import { pairChefByGenre } from "./lib/chef";
 import { sql } from "./lib/db";
+import { geocodeUsZip, normalizeUsZip } from "./lib/geocode";
 
 const jsonHeaders = { "Content-Type": "application/json" };
 
@@ -71,11 +72,36 @@ export const handler: Handler = async (event, context) => {
     }
 
     const hostRows = await sql`
-      SELECT address, first_name, surname, mobile_phone FROM hosts WHERE id = ${host.id} LIMIT 1
+      SELECT address, zip, first_name, surname, mobile_phone FROM hosts WHERE id = ${host.id} LIMIT 1
     `;
     const h = hostRows[0] as
-      | { address: string; first_name: string | null; surname: string | null; mobile_phone: string | null }
+      | {
+          address: string;
+          zip: string | null;
+          first_name: string | null;
+          surname: string | null;
+          mobile_phone: string | null;
+        }
       | undefined;
+
+    const zip = normalizeUsZip(h?.zip) ?? normalizeUsZip(h?.address);
+    if (!zip) {
+      return {
+        statusCode: 400,
+        headers: jsonHeaders,
+        body: JSON.stringify({ error: "Host profile needs a ZIP code before creating a meal" }),
+      };
+    }
+
+    let latitude: number | null = null;
+    let longitude: number | null = null;
+    const geo = await geocodeUsZip(zip);
+    if (geo.ok) {
+      latitude = geo.lat;
+      longitude = geo.lng;
+    } else {
+      console.warn("host-meal-upsert: geocode failed", geo.error, zip);
+    }
 
     const chefId = await pairChefByGenre(foodGenre);
     const chefRows = chefId
@@ -88,13 +114,14 @@ export const handler: Handler = async (event, context) => {
 
     const created = await sql`
       INSERT INTO dinners (
-        host_id, chef_id, address, host_name, host_contact,
+        host_id, chef_id, address, zip, latitude, longitude, host_name, host_contact,
         title, month, year, neighborhood, chef_name,
         food_genre, drink_pairing, menu_line, display_date,
         status, is_visible
       )
       VALUES (
         ${host.id}, ${chefId}, ${h?.address ?? null},
+        ${zip}, ${latitude}, ${longitude},
         ${[h?.first_name, h?.surname].filter(Boolean).join(" ") || null},
         ${h?.mobile_phone ?? null},
         ${title}, ${month}, ${year}, ${neighborhood}, ${chefName},

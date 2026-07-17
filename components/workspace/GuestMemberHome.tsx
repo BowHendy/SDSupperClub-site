@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { initNetlifyIdentity, loadNetlifyIdentity } from "@/lib/netlify-identity";
+import { isSignedIn, signOut } from "@/lib/auth-session";
 import { fetchAuthed, netlifyFunctionUrl } from "@/lib/netlify-api";
 import { AuthenticatedShell } from "@/components/auth/AuthenticatedShell";
 import { RoleApplicationForms } from "@/components/workspace/RoleApplicationForms";
@@ -72,9 +72,7 @@ export function GuestMemberHome({ expectedRole }: Props) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      await initNetlifyIdentity();
-      const ni = await loadNetlifyIdentity();
-      if (!ni.currentUser()) {
+      if (!(await isSignedIn())) {
         router.replace("/login/");
         return;
       }
@@ -119,16 +117,26 @@ export function GuestMemberHome({ expectedRole }: Props) {
         method: "POST",
         body: JSON.stringify({ mealId: summary.meal.id }),
       });
-      const checkoutJson = await checkoutRes.json();
-      if (checkoutRes.ok && checkoutJson.url) {
-        window.location.href = checkoutJson.url as string;
+      const checkoutJson = (await checkoutRes.json()) as {
+        url?: string;
+        mode?: string;
+        error?: string;
+      };
+      if (!checkoutRes.ok) {
+        throw new Error(checkoutJson.error ?? "Checkout failed");
+      }
+      if (checkoutJson.url) {
+        window.location.href = checkoutJson.url;
         return;
+      }
+      if (checkoutJson.mode !== "demo") {
+        throw new Error("Unexpected checkout response");
       }
       const res = await fetchAuthed(netlifyFunctionUrl("confirm-payment"), {
         method: "POST",
         body: JSON.stringify({ mealId: summary.meal.id }),
       });
-      const json = await res.json();
+      const json = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(json.error ?? "Payment failed");
       await loadSummary();
     } catch (e) {
@@ -180,8 +188,7 @@ export function GuestMemberHome({ expectedRole }: Props) {
         <button
           type="button"
           onClick={async () => {
-            const ni = await loadNetlifyIdentity();
-            await ni.logout();
+            await signOut();
             router.replace("/login/");
           }}
           className="font-geist text-body-sm text-foreground/70 hover:text-foreground"

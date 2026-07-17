@@ -118,7 +118,8 @@ All marketing content lives on one page. Navigation uses hash links:
 ├── #experience      Experience          (components/sections/Experience.tsx)
 ├── #past-menus      Past Menus          (components/sections/PastMenus.tsx)
 ├── #how-to-join     How to Join         (components/sections/Membership.tsx)
-├── #request-invite  Invite form         (components/ui/InviteForm.tsx)
+├── #request-invite  Join form (InviteForm → Netlify Forms)
+├── #calendar        Upcoming dinner teaser (date + ZIP when logged out)
 └── #calendar        Upcoming dinner     (components/sections/UpcomingDinner.tsx)
 ```
 
@@ -193,19 +194,18 @@ sequenceDiagram
   participant Admin
 
   Visitor->>Site: / → scroll to #request-invite
-  Visitor->>Site: Submit invite form
-  Site->>Forms: POST invite-request (urlencoded)
+  Visitor->>Site: Submit InviteForm
+  Site->>Forms: POST invite-request
   Forms->>Fn: Verified submission event
-  Fn->>Site: INSERT invitation_requests (pending)
-  Fn->>Resend: Email ADMIN_NOTIFICATION_EMAIL
-  Resend->>Admin: New membership request
+  Fn->>Site: INSERT invitation_requests pending
+  Fn->>Resend: Email admin inbox
 ```
 
 **Code:** `components/ui/InviteForm.tsx` → `netlify/functions/submission-created.ts`
 
 ---
 
-### 2. Admin approves a request
+### 2. Admin approves a join request
 
 ```mermaid
 sequenceDiagram
@@ -273,7 +273,7 @@ flowchart LR
 | ---- | -- | --- |
 | Any page | `/` | Logo “Supper Collective” |
 | `/` | `#experience`, `#past-menus`, `#how-to-join`, `#calendar` | Nav links |
-| `/` | `#request-invite` | “Request Invite” button |
+| `/` | `#request-invite` | “Request to Join” CTA |
 | `/` → Upcoming Dinner | `/login/` | “Log in” when meal is live |
 | Unauthenticated | `/admin/` or `/members/` | Redirect to `/login/` |
 | `/login/` | `/members/` | After successful Identity login |

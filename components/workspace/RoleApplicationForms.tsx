@@ -28,6 +28,7 @@ export function RoleApplicationForms({
     message: "",
     mobilePhone: "",
     address: "",
+    zip: "",
     allergies: "",
     kitchenPhotoUrl: "",
     diningPhotoUrl: "",
@@ -59,6 +60,7 @@ export function RoleApplicationForms({
         message: "",
         mobilePhone: "",
         address: "",
+        zip: "",
         allergies: "",
         kitchenPhotoUrl: "",
         diningPhotoUrl: "",
@@ -121,8 +123,17 @@ export function RoleApplicationForms({
               onChange={(e) => setHostForm((f) => ({ ...f, address: e.target.value }))}
               rows={3}
               disabled={pendingHostRequest || busy}
-              placeholder="Full address (street, city, ZIP)"
+              placeholder="Full address (street, city)"
               className="w-full resize-none rounded border border-white/20 bg-transparent px-4 py-3 font-geist text-foreground placeholder:text-foreground/40 disabled:opacity-50"
+            />
+            <input
+              value={hostForm.zip}
+              onChange={(e) => setHostForm((f) => ({ ...f, zip: e.target.value }))}
+              disabled={pendingHostRequest || busy}
+              placeholder="ZIP code"
+              inputMode="numeric"
+              autoComplete="postal-code"
+              className="w-full rounded border border-white/20 bg-transparent px-4 py-3 font-geist text-foreground placeholder:text-foreground/40 disabled:opacity-50"
             />
             <input
               value={hostForm.allergies}

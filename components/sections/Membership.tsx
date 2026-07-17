@@ -25,12 +25,7 @@ export function Membership() {
         </FadeIn>
         <span id="request-invite" className="scroll-mt-24" aria-hidden />
         <FadeIn delay={0.2}>
-          <h3 className="mt-12 font-cormorant text-xl text-foreground">{m.formTitle}</h3>
-          <p className="mt-3 font-geist text-body-sm text-foreground/70">
-            Complete this form to ask to join the community. An admin will review your application
-            before you can register and request seats at upcoming dinners.
-          </p>
-          <div className="mt-8">
+          <div className="mt-12">
             <InviteForm />
           </div>
         </FadeIn>

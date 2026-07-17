@@ -1,13 +1,20 @@
 import type { Handler } from "@netlify/functions";
 import { getNetlifyUser, getOrCreateAppUser } from "./lib/auth";
-import { fulfillGuestCheckout, recordPayment, retrieveCheckoutSession, stripeEnabled } from "./lib/stripe";
+import {
+  demoPaymentsAllowed,
+  fulfillGuestCheckout,
+  recordPayment,
+  requirePaymentsReady,
+  retrieveCheckoutSession,
+  stripeEnabled,
+} from "./lib/stripe";
 import { sql } from "./lib/db";
 
 const jsonHeaders = { "Content-Type": "application/json" };
 
 /**
- * Payment: marks attendance as paid (demo) or after Stripe checkout.
- * In Stripe mode, requires sessionId and verifies payment with Stripe before fulfilling.
+ * Payment: after Stripe checkout (verified), or demo fulfillment when explicitly allowed.
+ * Without Stripe, demo mark-paid is refused unless ALLOW_DEMO_PAYMENTS=true (non-production).
  */
 export const handler: Handler = async (event, context) => {
   if (event.httpMethod !== "POST") {
@@ -30,6 +37,15 @@ export const handler: Handler = async (event, context) => {
     const appUser = await getOrCreateAppUser(netlifyUser);
     if (!appUser.profile_complete) {
       return { statusCode: 400, headers: jsonHeaders, body: JSON.stringify({ error: "Complete your profile before paying" }) };
+    }
+
+    const payments = requirePaymentsReady();
+    if (!payments.ok) {
+      return {
+        statusCode: payments.status,
+        headers: jsonHeaders,
+        body: JSON.stringify({ error: payments.error }),
+      };
     }
 
     if (stripeEnabled()) {
@@ -88,6 +104,15 @@ export const handler: Handler = async (event, context) => {
       };
     }
 
+    // Demo fulfillment only — requirePaymentsReady already gated this path.
+    if (!demoPaymentsAllowed()) {
+      return {
+        statusCode: 503,
+        headers: jsonHeaders,
+        body: JSON.stringify({ error: "Demo payments are not allowed in this environment" }),
+      };
+    }
+
     const attRows = await sql`
       SELECT status FROM dinner_guests
       WHERE dinner_id = ${mealId} AND member_id = ${appUser.id} LIMIT 1
@@ -138,7 +163,13 @@ export const handler: Handler = async (event, context) => {
     return {
       statusCode: 200,
       headers: jsonHeaders,
-      body: JSON.stringify({ ok: true, paidCount, maxSeats: meal.max_seats, mealFull: paidCount >= meal.max_seats }),
+      body: JSON.stringify({
+        ok: true,
+        mode: "demo",
+        paidCount,
+        maxSeats: meal.max_seats,
+        mealFull: paidCount >= meal.max_seats,
+      }),
     };
   } catch (e) {
     console.error("confirm-payment", e);

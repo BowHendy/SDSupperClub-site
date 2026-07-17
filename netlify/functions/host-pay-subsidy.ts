@@ -2,7 +2,7 @@ import type { Handler } from "@netlify/functions";
 import { getNetlifyUser, getOrCreateAppUser } from "./lib/auth";
 import { getApprovedHostForMember, hostOwnsDinner } from "./lib/host";
 import { countPaidSeats } from "./lib/meal";
-import { recordPayment, stripeEnabled } from "./lib/stripe";
+import { recordPayment, requirePaymentsReady, stripeEnabled } from "./lib/stripe";
 import { sql } from "./lib/db";
 
 const jsonHeaders = { "Content-Type": "application/json" };
@@ -45,6 +45,15 @@ export const handler: Handler = async (event, context) => {
     }
 
     const amount = shortfall * Number(meal.meal_price_per_guest);
+
+    const payments = requirePaymentsReady();
+    if (!payments.ok) {
+      return {
+        statusCode: payments.status,
+        headers: jsonHeaders,
+        body: JSON.stringify({ error: payments.error }),
+      };
+    }
 
     if (!stripeEnabled()) {
       await sql`

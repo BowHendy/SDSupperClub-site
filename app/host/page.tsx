@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { initNetlifyIdentity, loadNetlifyIdentity } from "@/lib/netlify-identity";
+import { isSignedIn } from "@/lib/auth-session";
 import { AuthenticatedShell } from "@/components/auth/AuthenticatedShell";
 import { HostWorkspace } from "@/components/workspace/HostWorkspace";
 
@@ -12,10 +12,11 @@ export default function HostPage() {
 
   useEffect(() => {
     (async () => {
-      await initNetlifyIdentity();
-      const ni = await loadNetlifyIdentity();
-      if (!ni.currentUser()) router.replace("/login/");
-      else setReady(true);
+      if (!(await isSignedIn())) {
+        router.replace("/login/");
+        return;
+      }
+      setReady(true);
     })();
   }, [router]);
 

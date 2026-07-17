@@ -42,7 +42,15 @@ export const handler: Handler = async (event, context) => {
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    console.error("admin-list-applications", e);
     const statusCode = msg === "Unauthorized" ? 401 : msg === "Forbidden" ? 403 : 500;
-    return { statusCode, headers: jsonHeaders, body: JSON.stringify({ error: statusCode === 500 ? "Server error" : msg }) };
+    return {
+      statusCode,
+      headers: jsonHeaders,
+      body: JSON.stringify({
+        error: statusCode === 500 ? "Server error" : msg,
+        detail: statusCode === 500 ? msg : undefined,
+      }),
+    };
   }
 };

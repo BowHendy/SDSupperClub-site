@@ -37,7 +37,7 @@ export const handler: Handler = async (event) => {
   }
 
   // Deprecated: Web3Forms webhooks are a paid feature. The marketing invite form uses Netlify
-  // Forms + Netlify reCAPTCHA (`InviteForm.tsx`); submissions do not hit this endpoint. This
+  // Forms + Netlify reCAPTCHA (legacy InviteForm removed); submissions do not hit this endpoint. This
   // handler remains only for legacy Web3Forms integrations that still POST here.
 
   try {

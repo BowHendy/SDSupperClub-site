@@ -46,11 +46,12 @@ Use this document as the single source of truth for actor roles, meal lifecycle,
 | Topic | Decision |
 |-------|----------|
 | **Guest vs Member** | Everyone starts as **Guest**. They become **Member** only after: host accepted them for a meal + completed profile + paid + **physically attended** that meal. Rejected meal applicants stay Guests. |
-| **Onboarding** | **Replace** the public "request club invite" form. First action for a new user is **request to attend a meal** → email to create password. No admin pre-screen on meal requests — **host only** sees applications. |
+| **Onboarding** | Public **request to join** form (no meal commitment) → admin reviews → Identity invite / create password. **Request a seat** is post-login only (guest/member home). Public calendar shows a redacted nearest meal (date + ZIP) to tempt join/login. |
 | **RSVP flow** | Auto-**waitlisted** on request → host approves/rejects from list → on approve: login + complete profile → payment email. Request stays active until meal is **full (10 seats)** or host rejects. |
 | **Attendee cancel** | **Full refund only if 14+ days before dinner**. **No refund if cancelling with less than 2 weeks notice.** Before pay: cancel freely while pending. |
 | **Host cancel (general)** | Host requests cancel → admin approves → **full refund** to all paid attendees (unless late-cancel rules below apply to host penalties only). |
-| **Payments** | **Stripe Connect** with real escrow/holding of attendee funds. |
+| **Payments (interim)** | **Platform Stripe Checkout** — guest (and subsidy) charges land in the platform Stripe account. `payments` / `payouts` are **ops ledger rows**, not Connect transfers or real escrow. Demo fulfillment only with `ALLOW_DEMO_PAYMENTS=true` outside production. |
+| **Payments (future)** | Stripe Connect + destination charges / escrow when ready to split chef/host payouts automatically. |
 | **Attendance fee** | **Global on/off toggle** (admin only) — can be disabled early as platform gains traction. When on, charged on top of meal cost. |
 | **Concurrent meals** | **One live dinner per approved host**; multiple hosts = multiple simultaneous live dinners. |
 | **Chef onboarding** | Separate **`/chef/apply`** route: CV + past references → admin approves. |
@@ -61,11 +62,11 @@ Use this document as the single source of truth for actor roles, meal lifecycle,
 | **T−30 days (1 month before meal)** | **Host AND chef must both independently confirm** the meal goes forward. Must occur **before any attendees are confirmed** (no guest approvals/confirmations until dual confirm complete). |
 | **Fill threshold** | **80% = 8 paid seats** minimum; **warning at ≤8** at T−14; **on track at 9–10** without deficit warning. |
 | **T−14 days** | If **≤ 8 paid** (including exactly 8): **warning email** — host may continue only by **subsidizing shortfall via platform**. If host **won't** subsidize: **host requests cancel → admin approves**. |
-| **Host subsidy** | Host pays unfilled seats so pot = **10-person equivalent**. If **2+ additional guests pay later**, host **refunded** for those seat-equivalents. Host **card on file** required. |
+| **Host subsidy** | Host pays unfilled seats so pot = **10-person equivalent**. If **2+ additional guests pay later**, host **refunded** for those seat-equivalents. **Interim:** one-shot Checkout / demo subsidy payment (no saved card). **Future:** host card on file. |
 | **T−7 days** | If subsidy satisfied (8+ paid OR host top-up): **automatic** chef **ingredient payment** = **~50% of full 10-person pot**. If subsidy **not** satisfied: **auto-cancel** + guest refunds. |
-| **Late host cancel (after T−7 ingredient paid)** | **Guests still get full refunds.** Host **loses own seat cost** and must **cover remaining ingredient costs** already paid to chef (charge card on file). **Chef keeps** ingredient payment. |
+| **Late host cancel (after T−7 ingredient paid)** | **Guests still get full refunds.** Host **loses own seat cost** and must **cover remaining ingredient costs** already paid to chef. **Chef keeps** ingredient payment. **Interim:** admin resolves charges off-platform / manually. **Future:** charge card on file. |
 | **Post-meal chef pay** | Host triggers **remainder** after meal unless dispute flagged. |
-| **Seat payment** | **Everyone pays for a seat**, including **host** (counts toward 10). Host must keep **card on file** for subsidy and late-cancel charges. |
+| **Seat payment** | **Everyone pays for a seat**, including **host** (counts toward 10). **Interim:** Checkout per seat. **Future:** host keeps card on file for subsidy and late-cancel charges. |
 | **T−14 at exactly 8 paid** | Send **warning email anyway** — “at minimum; consider subsidizing to reach 10.” |
 | **Public listing before T−30** | Meal is **hidden from public catalog** until **T−30 dual confirm** succeeds (host + chef both confirm). No public discoverability or seat requests before then. |
 | **Guest cancel after host subsidy** | **No automated rule** — if a paying guest cancels (14+ days) after host subsidized, **defer to admin** to resolve subsidy adjustment manually. |
@@ -321,23 +322,23 @@ Schema: [`netlify/db/schema.sql`](../netlify/db/schema.sql). Sitemap: [`docs/sit
 | Area | Status |
 |------|--------|
 | Identity login + `members` row | Done — needs meal-first trigger; rename UI labels Guest/Member |
-| Admin invitation approve/reject UI | Done — **to be removed/replaced** |
-| Guest requests seat on one live dinner | Partial — no host approve step |
-| Host request form | Partial — optional equipment checkboxes; profile not required before admin submit; no admin approval UI |
-| Demo payment stub | Stub — replace with Stripe Connect |
+| Admin invitation approve/reject UI | Restored — New Guests tab for join-without-meal applications |
+| Guest requests seat on one live dinner | Done — public `MealRequestForm` + host approve step |
+| Host request form | Done — profile + equipment before admin submit |
+| Payments | Interim platform Checkout + opt-in demo — **not** Stripe Connect yet |
 
 ### Major mismatches to resolve
 
 | Requirement | Current state |
 |-------------|---------------|
-| Meal-first onboarding | Invite form + admin membership pipeline |
-| Guest → Member after attend + profile + pay | No role promotion; `dinner_guests` only |
-| Host profile before admin approval | Host request sends partial data; profile completion implied after approval |
-| Host approves before payment | Waitlisted → demo pay with no host step |
-| One live meal per host | Single global live dinner promotion |
-| Chef apply + admin approve | `chefs` table unused |
-| Primary role per user | No `primary_role` field |
-| Stripe Connect + split payouts | Not implemented |
+| Meal-first onboarding | Reverted for public entry (Jul 2026): club join form + admin gate; seat request post-login |
+| Guest → Member after attend + profile + pay | Done via `host-mark-attended` + profile + paid path |
+| Host profile before admin approval | Done |
+| Host approves before payment | Done |
+| One live meal per host | Done |
+| Chef apply + admin approve | Done |
+| Primary role per user | Done |
+| Stripe Connect + split payouts | **Future** — interim is platform Checkout + ops `payouts` |
 | T−30 dual confirm | Not implemented |
 | T−14 / T−7 milestone jobs | Not implemented |
 
@@ -365,9 +366,11 @@ Meal-first signup; **Guest/Member** primary roles and UI labels; host apply = **
 
 Host meal CRUD; chef pairing/agreement; public live meals; promote **Guest → Member** after first attendance.
 
-### Phase 3 — Stripe Connect
+### Phase 3 — Platform Checkout (interim); Connect later
 
-Checkout (guests + **host seat**); escrow; fee toggle; **T−14 subsidy payments + refund when seats fill**; **T−7 automatic chef ingredient payout**; remainder + refund rules.
+**Current (shipped):** platform Stripe Checkout for guest seats + host subsidy when `STRIPE_SECRET_KEY` is set; fail-closed without it unless `ALLOW_DEMO_PAYMENTS=true` (non-production); attendance fee toggle; T−14 / T−7 cron bookkeeping via `payments` / `payouts` ops rows.
+
+**Not yet (Connect):** destination charges, real escrow hold/release, saved cards, automatic chef Connect payouts.
 
 ### Phase 4 — Ops
 
@@ -380,7 +383,7 @@ Disputes; **auto-cancel at T−7**; cancellation edge-case resolution; milestone
 | File | Change |
 |------|--------|
 | [`netlify/db/schema.sql`](../netlify/db/schema.sql) | Schema additions above |
-| [`components/ui/InviteForm.tsx`](../components/ui/InviteForm.tsx) | Remove/replace with meal-first request |
+| [`components/ui/MealRequestForm.tsx`](../components/ui/MealRequestForm.tsx) | Meal-first public seat request (replaces InviteForm) |
 | [`app/members/page.tsx`](../app/members/page.tsx) | Refactor → Guest/Member role-aware UI |
 | [`netlify/functions/request-host.ts`](../netlify/functions/request-host.ts) | Require full profile + equipment before pending |
 | `app/host/`, `app/chef/`, `app/guest/`, `app/member/` | New role workspaces |
@@ -447,10 +450,10 @@ Use this as a high-level progress tracker. Do not start coding until edge cases 
 - [x] **Q&A Round 3** — EC1–EC5 + G1–G4 answered (2026-06-08)
 - [x] **Miro** — Diagram 7 spec in [`miro-diagram-7.md`](miro-diagram-7.md) (manual push when board MCP access allowed)
 - [x] **Schema design** — tables/fields landed in [`schema.sql`](../netlify/db/schema.sql) + non-destructive [`migrate-actor-model.sql`](../netlify/db/migrate-actor-model.sql)
-- [x] **UI IA** — role-aware nav (`AuthenticatedShell`); `/guest/` `/member/` `/host/` `/chef/` routes; admin tabs: Applications, Meals, Funds, Disputes, Invitations (legacy)
+- [x] **UI IA** — role-aware nav (`AuthenticatedShell`); `/guest/` `/member/` `/host/` `/chef/` routes; admin tabs: New Guests, Applications, Meals, Fees, Disputes
 - [x] **Phase 1** — meal-first signup (`request-meal-seat` + `MealRequestForm`); Guest/Member roles; host profile + equipment before admin submit; host attendee approve/reject; chef apply + admin approve/reject; Guest→Member on `host-mark-attended`
 - [x] **Phase 2** — host meal CRUD + auto chef pairing; one live meal per host; T−30 dual confirm (hidden until both confirm — EC4); chef pricing flow
-- [x] **Phase 3** — Stripe checkout stub + demo fallback; host subsidy; attendance fee global toggle (G1); T−14 warning (EC2) + T−7 ingredient payout / auto-cancel in cron
+- [x] **Phase 3** — Platform Checkout (+ fail-closed / opt-in demo); host subsidy; attendance fee global toggle (G1); T−14 warning (EC2) + T−7 ingredient payout / auto-cancel in cron. Connect deferred.
 - [x] **Phase 4** — disputes flag + admin resolve; host cancel request + admin approve; milestone emails, archival, guest cancel with 14-day refund rule
 
 ### Phase 1–4 build notes (2026-06-08)
@@ -464,12 +467,12 @@ New/changed backend functions (Phase 1):
 - [`lib/host.ts`](../netlify/functions/lib/host.ts) — approved-host resolution + ownership checks
 - [`lib/email-templates.ts`](../netlify/functions/lib/email-templates.ts) — host/chef/attendee decision emails
 
-Deviation: the legacy invitation pipeline is retained as a fifth admin tab (not removed) because `lib/auth.ts` still gates `is_approved` on approved invites for non–meal-first users.
+Deviation (Jul 2026): Public onboarding is **join-without-meal** again (InviteForm + Netlify Forms + admin New Guests). Calendar teases the nearest live dinner (browser geolocation) with API redaction when logged out (date + ZIP only). Seat requests remain post-login in guest/member home. `request-meal-seat` may still exist as an unused public endpoint.
 
 Phase 2–4 additions:
 - [`request-meal-seat.ts`](../netlify/functions/request-meal-seat.ts), [`save-member-profile.ts`](../netlify/functions/save-member-profile.ts) — meal-first public signup
 - [`get-public-meals.ts`](../netlify/functions/get-public-meals.ts), [`host-meal-upsert.ts`](../netlify/functions/host-meal-upsert.ts), [`host-meal-update.ts`](../netlify/functions/host-meal-update.ts), [`chef-set-meal-price.ts`](../netlify/functions/chef-set-meal-price.ts), [`host-agree-meal-price.ts`](../netlify/functions/host-agree-meal-price.ts), [`meal-dual-confirm.ts`](../netlify/functions/meal-dual-confirm.ts), [`host-mark-attended.ts`](../netlify/functions/host-mark-attended.ts)
-- [`create-checkout.ts`](../netlify/functions/create-checkout.ts), [`host-pay-subsidy.ts`](../netlify/functions/host-pay-subsidy.ts), [`lib/stripe.ts`](../netlify/functions/lib/stripe.ts) — Stripe when `STRIPE_SECRET_KEY` set, else demo mode
+- [`create-checkout.ts`](../netlify/functions/create-checkout.ts), [`host-pay-subsidy.ts`](../netlify/functions/host-pay-subsidy.ts), [`lib/stripe.ts`](../netlify/functions/lib/stripe.ts) — platform Checkout when `STRIPE_SECRET_KEY` set; demo only with `ALLOW_DEMO_PAYMENTS=true` (non-production)
 - [`scheduled-milestone-check.ts`](../netlify/functions/scheduled-milestone-check.ts) — daily cron (08:00 UTC) for T−14/T−7/archive
 - [`meal-flag-dispute.ts`](../netlify/functions/meal-flag-dispute.ts), [`admin-resolve-dispute.ts`](../netlify/functions/admin-resolve-dispute.ts), [`admin-list-meals.ts`](../netlify/functions/admin-list-meals.ts), [`admin-platform-settings.ts`](../netlify/functions/admin-platform-settings.ts)
 - [`guest-cancel-attendance.ts`](../netlify/functions/guest-cancel-attendance.ts), [`host-request-meal-cancel.ts`](../netlify/functions/host-request-meal-cancel.ts), [`admin-approve-meal-cancel.ts`](../netlify/functions/admin-approve-meal-cancel.ts)
