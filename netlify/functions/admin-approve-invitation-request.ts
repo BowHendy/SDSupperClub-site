@@ -31,6 +31,39 @@ export const handler: Handler = async (event, context) => {
       return { statusCode: 404, headers: jsonHeaders, body: JSON.stringify({ error: "Not found" }) };
     }
 
+    const identityCtx = (context as { clientContext?: { identity?: { token?: string; url?: string } } })
+      ?.clientContext?.identity;
+    const hasEnvToken = Boolean(process.env.NETLIFY_IDENTITY_ADMIN_TOKEN);
+    const hasContextToken = Boolean(identityCtx?.token);
+    // #region agent log
+    fetch("http://127.0.0.1:7791/ingest/9edce051-a32e-42af-9f1a-0a04a0d1bc57", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "2ef69d" },
+      body: JSON.stringify({
+        sessionId: "2ef69d",
+        hypothesisId: "A,B,C,D",
+        location: "admin-approve-invitation-request.ts:pre-invite",
+        message: "approve invite preflight",
+        data: {
+          requestStatus: req.status,
+          hasEnvToken,
+          hasContextToken,
+          hasIdentityUrl: Boolean(identityCtx?.url),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    console.log(
+      "[debug:2ef69d] approve invite preflight",
+      JSON.stringify({
+        requestStatus: req.status,
+        hasEnvToken,
+        hasContextToken,
+        hasIdentityUrl: Boolean(identityCtx?.url),
+      }),
+    );
+    // #endregion
+
     if (req.status !== "approved") {
       await sql`
         UPDATE invitation_requests
@@ -41,9 +74,38 @@ export const handler: Handler = async (event, context) => {
       `;
     }
 
-    const invite = await inviteIdentityUser(req.email);
+    const invite = await inviteIdentityUser(req.email, {
+      identityAdminToken: identityCtx?.token ?? null,
+    });
     if (!invite.ok) {
-      return { statusCode: 500, headers: jsonHeaders, body: JSON.stringify({ error: invite.error }) };
+      // #region agent log
+      fetch("http://127.0.0.1:7791/ingest/9edce051-a32e-42af-9f1a-0a04a0d1bc57", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "2ef69d" },
+        body: JSON.stringify({
+          sessionId: "2ef69d",
+          hypothesisId: "A,B,D",
+          location: "admin-approve-invitation-request.ts:invite-failed",
+          message: "invite failed after status update",
+          data: {
+            error: invite.error,
+            hasEnvToken,
+            hasContextToken,
+            markedApprovedBeforeInvite: true,
+            priorStatus: req.status,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+      return {
+        statusCode: 500,
+        headers: jsonHeaders,
+        body: JSON.stringify({
+          error: invite.error,
+          debug: { hasEnvToken, hasContextToken, priorStatus: req.status },
+        }),
+      };
     }
 
     // Optional helper email so the user knows to look for Netlify's invite email.

@@ -32,8 +32,36 @@ async function postJson(url: string, token: string, body: unknown): Promise<Resp
  * Netlify's public docs emphasize using `@netlify/identity` for admin operations,
  * but this repo uses lambda-compatible functions. So we call the GoTrue endpoint directly.
  */
-export async function inviteIdentityUser(email: string): Promise<InviteResult> {
-  const adminToken = process.env.NETLIFY_IDENTITY_ADMIN_TOKEN;
+export async function inviteIdentityUser(
+  email: string,
+  opts?: { identityAdminToken?: string | null },
+): Promise<InviteResult> {
+  const envToken = process.env.NETLIFY_IDENTITY_ADMIN_TOKEN;
+  const contextToken = opts?.identityAdminToken ?? null;
+  // Observe only — still require env token until logs confirm context fallback is viable.
+  const adminToken = envToken || null;
+  // #region agent log
+  fetch("http://127.0.0.1:7791/ingest/9edce051-a32e-42af-9f1a-0a04a0d1bc57", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "2ef69d" },
+    body: JSON.stringify({
+      sessionId: "2ef69d",
+      hypothesisId: "A,B",
+      location: "netlify-identity-admin.ts:inviteIdentityUser",
+      message: "invite token resolution",
+      data: {
+        hasEnvToken: Boolean(envToken),
+        hasContextToken: Boolean(contextToken),
+        using: adminToken ? "env" : "none",
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  console.log(
+    "[debug:2ef69d] invite token resolution",
+    JSON.stringify({ hasEnvToken: Boolean(envToken), hasContextToken: Boolean(contextToken) }),
+  );
+  // #endregion
   if (!adminToken) {
     return { ok: false, error: "Missing NETLIFY_IDENTITY_ADMIN_TOKEN" };
   }

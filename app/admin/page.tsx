@@ -268,7 +268,30 @@ export default function AdminPage() {
         method: "POST",
         body: JSON.stringify({ requestId }),
       });
-      const json = (await res.json()) as { ok?: boolean; error?: string };
+      const json = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        debug?: { hasEnvToken?: boolean; hasContextToken?: boolean; priorStatus?: string };
+      };
+      // #region agent log
+      fetch("http://127.0.0.1:7791/ingest/9edce051-a32e-42af-9f1a-0a04a0d1bc57", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "2ef69d" },
+        body: JSON.stringify({
+          sessionId: "2ef69d",
+          hypothesisId: "A,B,C,D",
+          location: "admin/page.tsx:approve",
+          message: "admin invite approve response",
+          data: {
+            ok: res.ok,
+            status: res.status,
+            error: json.error ?? null,
+            debug: json.debug ?? null,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       if (!res.ok) throw new Error(json.error ?? "Approval failed");
       await loadRequests();
     } catch (e) {
