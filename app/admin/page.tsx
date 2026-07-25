@@ -279,6 +279,7 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "2ef69d" },
         body: JSON.stringify({
           sessionId: "2ef69d",
+          runId: "ui-debug-surface",
           hypothesisId: "A,B,C,D",
           location: "admin/page.tsx:approve",
           message: "admin invite approve response",
@@ -291,8 +292,28 @@ export default function AdminPage() {
           timestamp: Date.now(),
         }),
       }).catch(() => {});
+      try {
+        localStorage.setItem(
+          "debug-2ef69d-approve",
+          JSON.stringify({
+            at: Date.now(),
+            ok: res.ok,
+            status: res.status,
+            error: json.error ?? null,
+            debug: json.debug ?? null,
+          }),
+        );
+      } catch {
+        /* ignore */
+      }
       // #endregion
-      if (!res.ok) throw new Error(json.error ?? "Approval failed");
+      if (!res.ok) {
+        const d = json.debug;
+        const debugSuffix = d
+          ? ` [debug hasEnvToken=${String(d.hasEnvToken)} hasContextToken=${String(d.hasContextToken)} priorStatus=${d.priorStatus ?? "?"}]`
+          : " [debug payload missing — deploy may be stale]";
+        throw new Error((json.error ?? "Approval failed") + debugSuffix);
+      }
       await loadRequests();
     } catch (e) {
       setActionError(e instanceof Error ? e.message : "Approval failed.");
