@@ -28,7 +28,7 @@ function tooManyRequests() {
   };
 }
 
-export const handler: Handler = async (event) => {
+export const handler: Handler = async (event, context) => {
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, headers: jsonHeaders, body: JSON.stringify({ error: "Method Not Allowed" }) };
   }
@@ -154,7 +154,12 @@ export const handler: Handler = async (event) => {
       throw e;
     }
 
-    const invite = await inviteIdentityUser(email);
+    const identityCtx = (context as { clientContext?: { identity?: { token?: string; url?: string } } })
+      ?.clientContext?.identity;
+    const invite = await inviteIdentityUser(email, {
+      identityAdminToken: identityCtx?.token ?? null,
+      identityUrl: identityCtx?.url ?? null,
+    });
     if (!invite.ok) {
       return { statusCode: 500, headers: jsonHeaders, body: JSON.stringify({ error: invite.error }) };
     }

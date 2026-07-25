@@ -41,6 +41,7 @@ export const handler: Handler = async (event, context) => {
       headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "2ef69d" },
       body: JSON.stringify({
         sessionId: "2ef69d",
+        runId: "post-fix",
         hypothesisId: "A,B,C,D",
         location: "admin-approve-invitation-request.ts:pre-invite",
         message: "approve invite preflight",
@@ -64,18 +65,10 @@ export const handler: Handler = async (event, context) => {
     );
     // #endregion
 
-    if (req.status !== "approved") {
-      await sql`
-        UPDATE invitation_requests
-        SET status = 'approved',
-            approved_at = now(),
-            approved_by = ${admin.email}
-        WHERE id = ${requestId}
-      `;
-    }
-
+    // Invite first — only mark approved if Identity invite succeeds (or already exists).
     const invite = await inviteIdentityUser(req.email, {
       identityAdminToken: identityCtx?.token ?? null,
+      identityUrl: identityCtx?.url ?? null,
     });
     if (!invite.ok) {
       // #region agent log
@@ -84,14 +77,15 @@ export const handler: Handler = async (event, context) => {
         headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "2ef69d" },
         body: JSON.stringify({
           sessionId: "2ef69d",
+          runId: "post-fix",
           hypothesisId: "A,B,D",
           location: "admin-approve-invitation-request.ts:invite-failed",
-          message: "invite failed after status update",
+          message: "invite failed before status update",
           data: {
             error: invite.error,
             hasEnvToken,
             hasContextToken,
-            markedApprovedBeforeInvite: true,
+            markedApprovedBeforeInvite: false,
             priorStatus: req.status,
           },
           timestamp: Date.now(),
@@ -108,6 +102,16 @@ export const handler: Handler = async (event, context) => {
       };
     }
 
+    if (req.status !== "approved") {
+      await sql`
+        UPDATE invitation_requests
+        SET status = 'approved',
+            approved_at = now(),
+            approved_by = ${admin.email}
+        WHERE id = ${requestId}
+      `;
+    }
+
     // Optional helper email so the user knows to look for Netlify's invite email.
     try {
       const welcome = buildWelcomeEmail(req.name);
@@ -122,6 +126,27 @@ export const handler: Handler = async (event, context) => {
       console.error("admin-approve-invitation-request: helper email failed", e);
     }
 
+    // #region agent log
+    fetch("http://127.0.0.1:7791/ingest/9edce051-a32e-42af-9f1a-0a04a0d1bc57", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "2ef69d" },
+      body: JSON.stringify({
+        sessionId: "2ef69d",
+        runId: "post-fix",
+        hypothesisId: "A,B",
+        location: "admin-approve-invitation-request.ts:success",
+        message: "invite approve succeeded",
+        data: {
+          invited: invite.invited,
+          hasEnvToken,
+          hasContextToken,
+          reason: "reason" in invite ? invite.reason : undefined,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+
     return { statusCode: 200, headers: jsonHeaders, body: JSON.stringify({ ok: true, invited: invite.invited }) };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -129,4 +154,3 @@ export const handler: Handler = async (event, context) => {
     return { statusCode, headers: jsonHeaders, body: JSON.stringify({ error: statusCode === 500 ? "Server error" : msg }) };
   }
 };
-

@@ -279,7 +279,7 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "2ef69d" },
         body: JSON.stringify({
           sessionId: "2ef69d",
-          runId: "ui-debug-surface",
+          runId: "post-fix",
           hypothesisId: "A,B,C,D",
           location: "admin/page.tsx:approve",
           message: "admin invite approve response",

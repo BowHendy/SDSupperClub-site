@@ -3,7 +3,10 @@ type InviteResult =
   | { ok: true; invited: false; reason: "already_exists" }
   | { ok: false; error: string; status?: number };
 
-function getIdentityBaseUrl(): string {
+function getIdentityBaseUrl(identityUrl?: string | null): string {
+  const fromContext = identityUrl?.replace(/\/+$/, "");
+  if (fromContext) return fromContext;
+
   const configured = process.env.NETLIFY_IDENTITY_URL;
   if (configured) return configured.replace(/\/+$/, "");
 
@@ -27,49 +30,52 @@ async function postJson(url: string, token: string, body: unknown): Promise<Resp
 /**
  * Invite a user by email via Netlify Identity (GoTrue).
  *
- * Requires a GoTrue admin token in `NETLIFY_IDENTITY_ADMIN_TOKEN`.
- *
- * Netlify's public docs emphasize using `@netlify/identity` for admin operations,
- * but this repo uses lambda-compatible functions. So we call the GoTrue endpoint directly.
+ * Prefers `NETLIFY_IDENTITY_ADMIN_TOKEN` when set; otherwise uses the short-lived
+ * admin JWT from `context.clientContext.identity` (Netlify Functions + Identity).
  */
 export async function inviteIdentityUser(
   email: string,
-  opts?: { identityAdminToken?: string | null },
+  opts?: { identityAdminToken?: string | null; identityUrl?: string | null },
 ): Promise<InviteResult> {
   const envToken = process.env.NETLIFY_IDENTITY_ADMIN_TOKEN;
   const contextToken = opts?.identityAdminToken ?? null;
-  // Observe only — still require env token until logs confirm context fallback is viable.
-  const adminToken = envToken || null;
+  const adminToken = envToken || contextToken || null;
+  const using = envToken ? "env" : contextToken ? "context" : "none";
   // #region agent log
   fetch("http://127.0.0.1:7791/ingest/9edce051-a32e-42af-9f1a-0a04a0d1bc57", {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "2ef69d" },
     body: JSON.stringify({
       sessionId: "2ef69d",
+      runId: "post-fix",
       hypothesisId: "A,B",
       location: "netlify-identity-admin.ts:inviteIdentityUser",
       message: "invite token resolution",
       data: {
         hasEnvToken: Boolean(envToken),
         hasContextToken: Boolean(contextToken),
-        using: adminToken ? "env" : "none",
+        using,
       },
       timestamp: Date.now(),
     }),
   }).catch(() => {});
   console.log(
     "[debug:2ef69d] invite token resolution",
-    JSON.stringify({ hasEnvToken: Boolean(envToken), hasContextToken: Boolean(contextToken) }),
+    JSON.stringify({ hasEnvToken: Boolean(envToken), hasContextToken: Boolean(contextToken), using }),
   );
   // #endregion
   if (!adminToken) {
-    return { ok: false, error: "Missing NETLIFY_IDENTITY_ADMIN_TOKEN" };
+    return {
+      ok: false,
+      error:
+        "Missing Identity admin token (set NETLIFY_IDENTITY_ADMIN_TOKEN or enable Identity so context.clientContext.identity.token is available)",
+    };
   }
 
-  const base = getIdentityBaseUrl();
+  const base = getIdentityBaseUrl(opts?.identityUrl);
   const endpoints = [
+    `${base}/invite`, // GoTrue classic (Netlify docs)
     `${base}/admin/invites`, // some deployments
-    `${base}/invite`, // GoTrue classic
   ];
 
   let lastError: InviteResult | null = null;
@@ -77,7 +83,7 @@ export async function inviteIdentityUser(
   for (const endpoint of endpoints) {
     try {
       const res = await postJson(endpoint, adminToken, { email });
-      if (res.ok) {
+      if (res.ok || res.status === 204) {
         return { ok: true, invited: true };
       }
 
@@ -95,4 +101,3 @@ export async function inviteIdentityUser(
 
   return lastError ?? { ok: false, error: "Identity invite failed" };
 }
-
