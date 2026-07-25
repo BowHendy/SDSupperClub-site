@@ -268,52 +268,8 @@ export default function AdminPage() {
         method: "POST",
         body: JSON.stringify({ requestId }),
       });
-      const json = (await res.json()) as {
-        ok?: boolean;
-        error?: string;
-        debug?: { hasEnvToken?: boolean; hasContextToken?: boolean; priorStatus?: string };
-      };
-      // #region agent log
-      fetch("http://127.0.0.1:7791/ingest/9edce051-a32e-42af-9f1a-0a04a0d1bc57", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "2ef69d" },
-        body: JSON.stringify({
-          sessionId: "2ef69d",
-          runId: "post-fix",
-          hypothesisId: "A,B,C,D",
-          location: "admin/page.tsx:approve",
-          message: "admin invite approve response",
-          data: {
-            ok: res.ok,
-            status: res.status,
-            error: json.error ?? null,
-            debug: json.debug ?? null,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      try {
-        localStorage.setItem(
-          "debug-2ef69d-approve",
-          JSON.stringify({
-            at: Date.now(),
-            ok: res.ok,
-            status: res.status,
-            error: json.error ?? null,
-            debug: json.debug ?? null,
-          }),
-        );
-      } catch {
-        /* ignore */
-      }
-      // #endregion
-      if (!res.ok) {
-        const d = json.debug;
-        const debugSuffix = d
-          ? ` [debug hasEnvToken=${String(d.hasEnvToken)} hasContextToken=${String(d.hasContextToken)} priorStatus=${d.priorStatus ?? "?"}]`
-          : " [debug payload missing — deploy may be stale]";
-        throw new Error((json.error ?? "Approval failed") + debugSuffix);
-      }
+      const json = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Approval failed");
       await loadRequests();
     } catch (e) {
       setActionError(e instanceof Error ? e.message : "Approval failed.");

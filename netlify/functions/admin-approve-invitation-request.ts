@@ -33,37 +33,6 @@ export const handler: Handler = async (event, context) => {
 
     const identityCtx = (context as { clientContext?: { identity?: { token?: string; url?: string } } })
       ?.clientContext?.identity;
-    const hasEnvToken = Boolean(process.env.NETLIFY_IDENTITY_ADMIN_TOKEN);
-    const hasContextToken = Boolean(identityCtx?.token);
-    // #region agent log
-    fetch("http://127.0.0.1:7791/ingest/9edce051-a32e-42af-9f1a-0a04a0d1bc57", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "2ef69d" },
-      body: JSON.stringify({
-        sessionId: "2ef69d",
-        runId: "post-fix",
-        hypothesisId: "A,B,C,D",
-        location: "admin-approve-invitation-request.ts:pre-invite",
-        message: "approve invite preflight",
-        data: {
-          requestStatus: req.status,
-          hasEnvToken,
-          hasContextToken,
-          hasIdentityUrl: Boolean(identityCtx?.url),
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    console.log(
-      "[debug:2ef69d] approve invite preflight",
-      JSON.stringify({
-        requestStatus: req.status,
-        hasEnvToken,
-        hasContextToken,
-        hasIdentityUrl: Boolean(identityCtx?.url),
-      }),
-    );
-    // #endregion
 
     // Invite first — only mark approved if Identity invite succeeds (or already exists).
     const invite = await inviteIdentityUser(req.email, {
@@ -71,35 +40,7 @@ export const handler: Handler = async (event, context) => {
       identityUrl: identityCtx?.url ?? null,
     });
     if (!invite.ok) {
-      // #region agent log
-      fetch("http://127.0.0.1:7791/ingest/9edce051-a32e-42af-9f1a-0a04a0d1bc57", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "2ef69d" },
-        body: JSON.stringify({
-          sessionId: "2ef69d",
-          runId: "post-fix",
-          hypothesisId: "A,B,D",
-          location: "admin-approve-invitation-request.ts:invite-failed",
-          message: "invite failed before status update",
-          data: {
-            error: invite.error,
-            hasEnvToken,
-            hasContextToken,
-            markedApprovedBeforeInvite: false,
-            priorStatus: req.status,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
-      return {
-        statusCode: 500,
-        headers: jsonHeaders,
-        body: JSON.stringify({
-          error: invite.error,
-          debug: { hasEnvToken, hasContextToken, priorStatus: req.status },
-        }),
-      };
+      return { statusCode: 500, headers: jsonHeaders, body: JSON.stringify({ error: invite.error }) };
     }
 
     if (req.status !== "approved") {
@@ -125,27 +66,6 @@ export const handler: Handler = async (event, context) => {
       // Don’t fail approval if the helper email fails; the Identity invite is the main action.
       console.error("admin-approve-invitation-request: helper email failed", e);
     }
-
-    // #region agent log
-    fetch("http://127.0.0.1:7791/ingest/9edce051-a32e-42af-9f1a-0a04a0d1bc57", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "2ef69d" },
-      body: JSON.stringify({
-        sessionId: "2ef69d",
-        runId: "post-fix",
-        hypothesisId: "A,B",
-        location: "admin-approve-invitation-request.ts:success",
-        message: "invite approve succeeded",
-        data: {
-          invited: invite.invited,
-          hasEnvToken,
-          hasContextToken,
-          reason: "reason" in invite ? invite.reason : undefined,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
 
     return { statusCode: 200, headers: jsonHeaders, body: JSON.stringify({ ok: true, invited: invite.invited }) };
   } catch (e) {

@@ -40,30 +40,6 @@ export async function inviteIdentityUser(
   const envToken = process.env.NETLIFY_IDENTITY_ADMIN_TOKEN;
   const contextToken = opts?.identityAdminToken ?? null;
   const adminToken = envToken || contextToken || null;
-  const using = envToken ? "env" : contextToken ? "context" : "none";
-  // #region agent log
-  fetch("http://127.0.0.1:7791/ingest/9edce051-a32e-42af-9f1a-0a04a0d1bc57", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "2ef69d" },
-    body: JSON.stringify({
-      sessionId: "2ef69d",
-      runId: "post-fix",
-      hypothesisId: "A,B",
-      location: "netlify-identity-admin.ts:inviteIdentityUser",
-      message: "invite token resolution",
-      data: {
-        hasEnvToken: Boolean(envToken),
-        hasContextToken: Boolean(contextToken),
-        using,
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  console.log(
-    "[debug:2ef69d] invite token resolution",
-    JSON.stringify({ hasEnvToken: Boolean(envToken), hasContextToken: Boolean(contextToken), using }),
-  );
-  // #endregion
   if (!adminToken) {
     return {
       ok: false,
