@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import type { PrimaryRole } from "@/lib/role-routes";
-import { ROLE_HOME } from "@/lib/role-routes";
 
 type Props = {
   role: PrimaryRole;
@@ -10,11 +9,11 @@ type Props = {
   children: React.ReactNode;
 };
 
-const NAV: { role: PrimaryRole; label: string }[] = [
-  { role: "guest", label: "Guest" },
-  { role: "member", label: "Member" },
-  { role: "host", label: "Host" },
-  { role: "chef", label: "Chef" },
+/** Guests share the Member destination; highlight Member for both. */
+const NAV: { href: string; label: string; activeFor: PrimaryRole[] }[] = [
+  { href: "/member/", label: "Members", activeFor: ["guest", "member"] },
+  { href: "/host/", label: "Host", activeFor: ["host"] },
+  { href: "/chef/", label: "Chef", activeFor: ["chef"] },
 ];
 
 export function AuthenticatedShell({ role, isAdmin, children }: Props) {
@@ -26,20 +25,23 @@ export function AuthenticatedShell({ role, isAdmin, children }: Props) {
             Supper Collective
           </Link>
           <nav className="flex flex-wrap gap-2">
-            {NAV.map(({ role: r, label }) => (
-              <Link
-                key={r}
-                href={ROLE_HOME[r]}
-                className={[
-                  "rounded border px-3 py-1.5 font-geist text-body-sm transition-colors",
-                  role === r
-                    ? "border-brass/60 bg-brass/10 text-brass"
-                    : "border-white/15 text-foreground/60 hover:text-foreground",
-                ].join(" ")}
-              >
-                {label}
-              </Link>
-            ))}
+            {NAV.map(({ href, label, activeFor }) => {
+              const active = activeFor.includes(role);
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className={[
+                    "rounded border px-3 py-1.5 font-geist text-body-sm transition-colors",
+                    active
+                      ? "border-brass/60 bg-brass/10 text-brass"
+                      : "border-white/15 text-foreground/60 hover:text-foreground",
+                  ].join(" ")}
+                >
+                  {label}
+                </Link>
+              );
+            })}
             {isAdmin && (
               <Link
                 href="/admin/"

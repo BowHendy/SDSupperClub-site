@@ -178,7 +178,10 @@ export function HostWorkspace() {
               <li className="font-geist text-body-sm text-foreground/60">No requests yet.</li>
             ) : (
               attendees.map((a) => (
-                <li key={String(a.id)} className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
+                <li
+                  key={String(a.id)}
+                  className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3"
+                >
                   <span className="font-geist text-body-sm text-foreground">
                     {[a.first_name, a.surname].filter(Boolean).join(" ") || String(a.email)}
                     <span className="ml-2 capitalize text-foreground/50">{String(a.status)}</span>
@@ -224,6 +227,13 @@ export function HostWorkspace() {
           </ul>
         </section>
       )}
+
+      <section className="rounded border border-white/10 bg-charcoal/80 p-8">
+        <h2 className="font-cormorant text-xl text-foreground">Meal ops</h2>
+        <p className="mt-3 font-geist text-body-sm text-foreground/60">
+          Skeleton — fill rate, cancel request, dispute flag, and chef remainder will live here.
+        </p>
+      </section>
     </div>
   );
 }

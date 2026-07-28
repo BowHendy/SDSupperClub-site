@@ -40,7 +40,7 @@ export default function MembersRedirectPage() {
 
         router.replace(homeForRole(json.primaryRole ?? "guest"));
       } catch {
-        if (!cancelled) router.replace("/guest/");
+        if (!cancelled) router.replace("/member/");
       }
     })();
     return () => {

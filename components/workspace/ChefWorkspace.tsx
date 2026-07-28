@@ -127,6 +127,13 @@ export function ChefWorkspace() {
           )}
         </ul>
       </section>
+
+      <section className="rounded border border-white/10 bg-charcoal/80 p-8">
+        <h2 className="font-cormorant text-xl text-foreground">Profile</h2>
+        <p className="mt-3 font-geist text-body-sm text-foreground/60">
+          Skeleton — chef bio, genres, and payout preferences will live here.
+        </p>
+      </section>
     </div>
   );
 }

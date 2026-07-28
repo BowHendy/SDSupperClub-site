@@ -37,16 +37,9 @@ type Summary = {
   isAdmin?: boolean;
 };
 
-const ROLE_LABEL: Record<PrimaryRole, string> = {
-  guest: "Guest home",
-  member: "Member home",
-  host: "Host workspace",
-  chef: "Chef workspace",
-};
-
 type Props = { expectedRole?: "guest" | "member" };
 
-export function GuestMemberHome({ expectedRole }: Props) {
+export function GuestMemberHome(_props: Props) {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -173,16 +166,19 @@ export function GuestMemberHome({ expectedRole }: Props) {
   }
 
   const role = summary?.primaryRole ?? "guest";
+  const isGuest = role === "guest";
+  const memberUnlocked = role === "member" || role === "host" || role === "chef";
 
   return (
     <AuthenticatedShell role={role} isAdmin={summary?.isAdmin}>
       <div className="mt-16 flex items-center justify-between">
         <div>
-          <h1 className="font-cormorant text-display-sm font-medium text-foreground">
-            {ROLE_LABEL[expectedRole ?? role]}
-          </h1>
+          <h1 className="font-cormorant text-display-sm font-medium text-foreground">Members</h1>
           {role === "member" && (
             <p className="mt-1 font-geist text-label uppercase tracking-wider text-brass">Verified Member</p>
+          )}
+          {isGuest && (
+            <p className="mt-1 font-geist text-label uppercase tracking-wider text-foreground/50">Guest access</p>
           )}
         </div>
         <button
@@ -197,6 +193,13 @@ export function GuestMemberHome({ expectedRole }: Props) {
         </button>
       </div>
 
+      {isGuest && (
+        <p className="mt-6 rounded border border-white/15 bg-white/5 p-4 font-geist text-body-sm text-foreground/75">
+          You&apos;re signed in as a guest. Most member features stay locked until you attend your first
+          supper and become a verified member. UI polish coming later.
+        </p>
+      )}
+
       {loadError && (
         <p className="mt-8 rounded border border-terracotta/40 bg-terracotta/10 p-4 font-geist text-body-sm text-terracotta">
           {loadError}
@@ -205,7 +208,13 @@ export function GuestMemberHome({ expectedRole }: Props) {
       {actionError && <p className="mt-4 font-geist text-body-sm text-terracotta">{actionError}</p>}
 
       {summary && (
-        <div className="mt-10 space-y-10">
+        <div
+          className={[
+            "mt-10 space-y-10",
+            isGuest ? "pointer-events-none select-none opacity-45" : "",
+          ].join(" ")}
+          aria-disabled={isGuest}
+        >
           {summary.attendance?.status === "approved" && !summary.profileComplete && (
             <section className="rounded border border-white/10 bg-charcoal/80 p-8">
               <h2 className="font-cormorant text-xl text-foreground">Complete your profile</h2>
@@ -216,14 +225,15 @@ export function GuestMemberHome({ expectedRole }: Props) {
                     placeholder={k}
                     value={profile[k]}
                     onChange={(e) => setProfile((p) => ({ ...p, [k]: e.target.value }))}
-                    className="rounded border border-white/20 bg-transparent px-4 py-3 font-geist text-foreground"
+                    disabled={isGuest || busy}
+                    className="rounded border border-white/20 bg-transparent px-4 py-3 font-geist text-foreground disabled:opacity-50"
                   />
                 ))}
                 <button
                   type="button"
-                  disabled={busy}
+                  disabled={isGuest || busy}
                   onClick={() => void saveProfile()}
-                  className="rounded border border-brass/60 px-5 py-2.5 font-geist text-body-sm text-brass"
+                  className="rounded border border-brass/60 px-5 py-2.5 font-geist text-body-sm text-brass disabled:opacity-40"
                 >
                   Save profile
                 </button>
@@ -244,9 +254,9 @@ export function GuestMemberHome({ expectedRole }: Props) {
                 {!summary.attendance && summary.meal.status === "live" && !summary.isFull && (
                   <button
                     type="button"
-                    disabled={busy}
+                    disabled={isGuest || busy}
                     onClick={() => void requestAttendance()}
-                    className="mt-6 rounded border border-foreground/60 px-5 py-2.5 font-geist text-body-sm text-foreground"
+                    className="mt-6 rounded border border-foreground/60 px-5 py-2.5 font-geist text-body-sm text-foreground disabled:opacity-40"
                   >
                     Request to attend
                   </button>
@@ -259,9 +269,9 @@ export function GuestMemberHome({ expectedRole }: Props) {
                       summary.profileComplete && (
                         <button
                           type="button"
-                          disabled={busy}
+                          disabled={isGuest || busy}
                           onClick={() => void pay()}
-                          className="mt-4 rounded border border-brass/60 px-5 py-2.5 font-geist text-body-sm text-brass"
+                          className="mt-4 rounded border border-brass/60 px-5 py-2.5 font-geist text-body-sm text-brass disabled:opacity-40"
                         >
                           Pay for your seat
                         </button>
@@ -272,16 +282,27 @@ export function GuestMemberHome({ expectedRole }: Props) {
             )}
           </section>
 
-          <RoleApplicationForms
-            isHostApproved={summary.isHostApproved}
-            isChefApproved={summary.isChefApproved}
-            pendingHostRequest={summary.pendingHostRequest}
-            pendingChefRequest={summary.pendingChefRequest}
-            busy={busy}
-            setBusy={setBusy}
-            onSubmitted={loadSummary}
-            onError={(msg) => setActionError(msg || null)}
-          />
+          {memberUnlocked && (
+            <section className="rounded border border-white/10 bg-charcoal/80 p-8">
+              <h2 className="font-cormorant text-xl text-foreground">Past meals</h2>
+              <p className="mt-3 font-geist text-body-sm text-foreground/60">
+                Skeleton — attended meal history will appear here.
+              </p>
+            </section>
+          )}
+
+          <div>
+            <RoleApplicationForms
+              isHostApproved={summary.isHostApproved}
+              isChefApproved={summary.isChefApproved}
+              pendingHostRequest={summary.pendingHostRequest}
+              pendingChefRequest={summary.pendingChefRequest}
+              busy={busy || isGuest}
+              setBusy={setBusy}
+              onSubmitted={loadSummary}
+              onError={(msg) => setActionError(msg || null)}
+            />
+          </div>
 
           {(summary.isHostApproved || summary.isChefApproved) && (
             <p className="font-geist text-body-sm text-foreground/60">
@@ -307,6 +328,12 @@ export function GuestMemberHome({ expectedRole }: Props) {
             </p>
           )}
         </div>
+      )}
+
+      {!summary && !loadError && (
+        <section className="mt-10 rounded border border-dashed border-white/20 p-8">
+          <p className="font-geist text-body-sm text-foreground/60">Members dashboard skeleton — loading…</p>
+        </section>
       )}
     </AuthenticatedShell>
   );

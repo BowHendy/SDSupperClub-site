@@ -6,29 +6,22 @@ import Link from "next/link";
 import { getUser } from "@netlify/identity";
 import { CreatePasswordForm } from "@/components/auth/CreatePasswordForm";
 import { LoginForm } from "@/components/auth/LoginForm";
+import { PasswordSuccessModal } from "@/components/auth/PasswordSuccessModal";
 import {
   clearIdentityAuthHash,
   getAuthTokenFromHash,
   getPasswordFlowFromHash,
+  type PasswordFlowType,
 } from "@/lib/netlify-identity-auth-hash";
-import { fetchAuthed } from "@/lib/netlify-api";
-import { netlifyFunctionUrl } from "@/lib/netlify-paths";
-
-async function redirectAfterLogin(router: { replace: (path: string) => void }) {
-  try {
-    const res = await fetchAuthed(netlifyFunctionUrl("admin-me"));
-    const json = (await res.json()) as { isAdmin?: boolean };
-    router.replace(json.isAdmin ? "/admin/" : "/members/");
-  } catch {
-    router.replace("/members/");
-  }
-}
+import { signOut } from "@/lib/auth-session";
+import { redirectAfterLogin } from "@/lib/redirect-after-login";
 
 export default function LoginPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [passwordFlow, setPasswordFlow] = useState<ReturnType<typeof getPasswordFlowFromHash>>(null);
+  const [passwordFlow, setPasswordFlow] = useState<PasswordFlowType | null>(null);
   const [authToken, setAuthToken] = useState<string | null>(null);
+  const [passwordSuccessFlow, setPasswordSuccessFlow] = useState<PasswordFlowType | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,6 +35,7 @@ export default function LoginPage() {
           setAuthToken(token);
         }
 
+        // Don't auto-redirect when finishing invite/recovery or showing success.
         if (!flow) {
           const user = await getUser();
           if (!cancelled && user) {
@@ -67,6 +61,18 @@ export default function LoginPage() {
     setAuthToken(null);
   };
 
+  const handlePasswordCreated = async (flow: PasswordFlowType) => {
+    clearIdentityAuthHash();
+    await signOut();
+    setPasswordFlow(null);
+    setAuthToken(null);
+    setPasswordSuccessFlow(flow);
+  };
+
+  const handleSuccessContinue = () => {
+    setPasswordSuccessFlow(null);
+  };
+
   if (!mounted) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-charcoal">
@@ -81,7 +87,7 @@ export default function LoginPage() {
         <CreatePasswordForm
           flow={passwordFlow}
           token={authToken}
-          onSuccess={() => void redirectAfterLogin(router)}
+          onSuccess={() => void handlePasswordCreated(passwordFlow)}
           onCancel={handleCancelPassword}
         />
       </div>
@@ -90,8 +96,12 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-charcoal px-6 py-16">
+      {passwordSuccessFlow && (
+        <PasswordSuccessModal flow={passwordSuccessFlow} onContinue={handleSuccessContinue} />
+      )}
+
       <div className="w-full max-w-sm">
-        <h1 className="font-cormorant text-display-sm font-medium text-foreground">Members</h1>
+        <h1 className="font-cormorant text-display-sm font-medium text-foreground">Sign in</h1>
         <p className="mt-2 font-geist text-body-sm text-foreground/70">
           Sign in with the email you were invited with. If you don&apos;t have an account yet, accept
           your invite email first — you&apos;ll set your password on this page.
