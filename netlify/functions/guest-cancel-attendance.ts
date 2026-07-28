@@ -1,5 +1,6 @@
 import type { Handler } from "@netlify/functions";
-import { getNetlifyUser, getOrCreateAppUser } from "./lib/auth";
+import { requireApprovedMember } from "./lib/auth";
+import { authStatusFromError, publicErrorMessage } from "./lib/security";
 import { daysUntilDisplayDate } from "./lib/meal";
 import { sql } from "./lib/db";
 
@@ -10,10 +11,6 @@ export const handler: Handler = async (event, context) => {
     return { statusCode: 405, headers: jsonHeaders, body: JSON.stringify({ error: "Method Not Allowed" }) };
   }
 
-  const netlifyUser = getNetlifyUser(context);
-  if (!netlifyUser) {
-    return { statusCode: 401, headers: jsonHeaders, body: JSON.stringify({ error: "Unauthorized" }) };
-  }
 
   try {
     const body = JSON.parse(event.body || "{}");
@@ -22,7 +19,7 @@ export const handler: Handler = async (event, context) => {
       return { statusCode: 400, headers: jsonHeaders, body: JSON.stringify({ error: "dinnerId required" }) };
     }
 
-    const appUser = await getOrCreateAppUser(netlifyUser);
+    const appUser = await requireApprovedMember(context);
 
     const attRows = await sql`
       SELECT dg.id, dg.status, d.display_date
@@ -69,6 +66,7 @@ export const handler: Handler = async (event, context) => {
     return { statusCode: 400, headers: jsonHeaders, body: JSON.stringify({ error: "Cannot cancel this attendance" }) };
   } catch (e) {
     console.error("guest-cancel-attendance", e);
-    return { statusCode: 500, headers: jsonHeaders, body: JSON.stringify({ error: "Server error" }) };
+    const statusCode = authStatusFromError(e);
+    return { statusCode, headers: jsonHeaders, body: JSON.stringify({ error: publicErrorMessage(e) }) };
   }
 };

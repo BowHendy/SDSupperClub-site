@@ -22,6 +22,8 @@ export type AppUser = {
   profile_complete: boolean;
 };
 
+export type ApprovedMember = AppUser & { netlifyUser: NetlifyUser };
+
 function normalizeRole(value: unknown): PrimaryRole {
   return value === "member" || value === "host" || value === "chef" ? value : "guest";
 }
@@ -55,6 +57,18 @@ export async function linkMealSeatRequests(memberId: string, email: string | nul
   }
 }
 
+/**
+ * Authenticated + approved club member (invite approved and/or meal-first seat linked).
+ * Keeps join flows intact; blocks open Identity self-signup from member APIs.
+ */
+export async function requireApprovedMember(context: HandlerContext): Promise<ApprovedMember> {
+  const netlifyUser = getNetlifyUser(context);
+  if (!netlifyUser?.sub) throw new Error("Unauthorized");
+  const appUser = await getOrCreateAppUser(netlifyUser);
+  if (!appUser.is_member_approved) throw new Error("Forbidden");
+  return { ...appUser, netlifyUser };
+}
+
 export async function getOrCreateAppUser(netlifyUser: NetlifyUser): Promise<AppUser> {
   const fullName =
     (netlifyUser.user_metadata?.full_name as string | undefined) ??
@@ -76,7 +90,7 @@ export async function getOrCreateAppUser(netlifyUser: NetlifyUser): Promise<AppU
   const approvedInviteRows = await sql`
     SELECT id, referred_by
     FROM invitation_requests
-    WHERE email = ${email}
+    WHERE lower(email) = lower(${email})
       AND status = 'approved'
     ORDER BY created_at DESC
     LIMIT 1
@@ -94,7 +108,6 @@ export async function getOrCreateAppUser(netlifyUser: NetlifyUser): Promise<AppU
     | { id: string; is_approved: boolean; primary_role: string; profile_complete: boolean }
     | undefined;
   if (existing) {
-    // Keep the row id stable, but allow approval to "turn on" when admins approve the invite later.
     if (shouldBeApproved && !existing.is_approved) {
       await sql`
         UPDATE members

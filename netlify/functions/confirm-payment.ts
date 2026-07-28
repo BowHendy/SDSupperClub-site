@@ -1,5 +1,6 @@
 import type { Handler } from "@netlify/functions";
-import { getNetlifyUser, getOrCreateAppUser } from "./lib/auth";
+import { requireApprovedMember } from "./lib/auth";
+import { authStatusFromError, publicErrorMessage } from "./lib/security";
 import {
   demoPaymentsAllowed,
   fulfillGuestCheckout,
@@ -21,10 +22,6 @@ export const handler: Handler = async (event, context) => {
     return { statusCode: 405, headers: jsonHeaders, body: JSON.stringify({ error: "Method Not Allowed" }) };
   }
 
-  const netlifyUser = getNetlifyUser(context);
-  if (!netlifyUser) {
-    return { statusCode: 401, headers: jsonHeaders, body: JSON.stringify({ error: "Unauthorized" }) };
-  }
 
   try {
     const body = JSON.parse(event.body || "{}");
@@ -34,7 +31,7 @@ export const handler: Handler = async (event, context) => {
       return { statusCode: 400, headers: jsonHeaders, body: JSON.stringify({ error: "mealId required" }) };
     }
 
-    const appUser = await getOrCreateAppUser(netlifyUser);
+    const appUser = await requireApprovedMember(context);
     if (!appUser.profile_complete) {
       return { statusCode: 400, headers: jsonHeaders, body: JSON.stringify({ error: "Complete your profile before paying" }) };
     }
@@ -173,6 +170,7 @@ export const handler: Handler = async (event, context) => {
     };
   } catch (e) {
     console.error("confirm-payment", e);
-    return { statusCode: 500, headers: jsonHeaders, body: JSON.stringify({ error: String(e) }) };
+    const statusCode = authStatusFromError(e);
+    return { statusCode, headers: jsonHeaders, body: JSON.stringify({ error: publicErrorMessage(e) }) };
   }
 };

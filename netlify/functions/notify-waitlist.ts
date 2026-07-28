@@ -4,7 +4,7 @@ const jsonHeaders = { "Content-Type": "application/json" };
 
 /**
  * Stub: promote waitlisted guests to "invited" and send email.
- * Protect with ADMIN_NOTIFY_SECRET in the `x-admin-secret` header when set.
+ * Requires ADMIN_NOTIFY_SECRET in the `x-admin-secret` header.
  */
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== "POST") {
@@ -12,11 +12,12 @@ export const handler: Handler = async (event) => {
   }
 
   const secret = process.env.ADMIN_NOTIFY_SECRET;
-  if (secret) {
-    const sent = event.headers["x-admin-secret"] ?? event.headers["X-Admin-Secret"];
-    if (sent !== secret) {
-      return { statusCode: 401, headers: jsonHeaders, body: JSON.stringify({ error: "Unauthorized" }) };
-    }
+  if (!secret) {
+    return { statusCode: 503, headers: jsonHeaders, body: JSON.stringify({ error: "Not configured" }) };
+  }
+  const sent = event.headers["x-admin-secret"] ?? event.headers["X-Admin-Secret"];
+  if (sent !== secret) {
+    return { statusCode: 401, headers: jsonHeaders, body: JSON.stringify({ error: "Unauthorized" }) };
   }
 
   return {

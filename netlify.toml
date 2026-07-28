@@ -8,3 +8,13 @@
 
 [functions."scheduled-milestone-check"]
   schedule = "0 8 * * *"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com; connect-src 'self' https://*.netlify.app https://*.netlify.com https://api.stripe.com; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; frame-src https://www.google.com https://js.stripe.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(self)"

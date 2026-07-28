@@ -22,14 +22,10 @@ function pickString(v: unknown): string | null {
   return String(v);
 }
 
-function getSiteUrl(event: { headers: Record<string, string | undefined> }): string | null {
+function getSiteUrl(): string | null {
   const env = process.env.URL ?? process.env.DEPLOY_PRIME_URL ?? process.env.NETLIFY_SITE_URL ?? null;
   if (env) return env.replace(/\/+$/, "");
-
-  const proto = event.headers["x-forwarded-proto"] ?? event.headers["X-Forwarded-Proto"] ?? "https";
-  const host = event.headers["x-forwarded-host"] ?? event.headers["X-Forwarded-Host"] ?? event.headers.host;
-  if (!host) return null;
-  return `${proto}://${host}`.replace(/\/+$/, "");
+  return null;
 }
 
 function rawSubmissionData(payload: Record<string, unknown>): Record<string, unknown> {
@@ -157,7 +153,7 @@ export const handler: Handler = async (event) => {
       return { statusCode: 200, headers: jsonHeaders, body: JSON.stringify({ ok: true }) };
     }
 
-    const siteUrl = getSiteUrl({ headers: event.headers });
+    const siteUrl = getSiteUrl();
     const loginUrl = siteUrl ? `${siteUrl}/login/` : "/login/";
     const adminUrl = siteUrl ? `${siteUrl}/admin/` : "/admin/";
 

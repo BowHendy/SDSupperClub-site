@@ -1,5 +1,6 @@
 import type { Handler } from "@netlify/functions";
-import { getNetlifyUser, getOrCreateAppUser } from "./lib/auth";
+import { requireApprovedMember } from "./lib/auth";
+import { authStatusFromError, publicErrorMessage } from "./lib/security";
 import { sql } from "./lib/db";
 
 const jsonHeaders = { "Content-Type": "application/json" };
@@ -27,10 +28,6 @@ export const handler: Handler = async (event, context) => {
     return { statusCode: 405, headers: jsonHeaders, body: JSON.stringify({ error: "Method Not Allowed" }) };
   }
 
-  const netlifyUser = getNetlifyUser(context);
-  if (!netlifyUser) {
-    return { statusCode: 401, headers: jsonHeaders, body: JSON.stringify({ error: "Unauthorized" }) };
-  }
 
   try {
     const body = JSON.parse(event.body || "{}");
@@ -55,15 +52,15 @@ export const handler: Handler = async (event, context) => {
       };
     }
 
+    const appUser = await requireApprovedMember(context);
+
     const fullName =
-      (netlifyUser.user_metadata?.full_name as string | undefined) ??
-      (netlifyUser.user_metadata?.name as string | undefined) ??
+      (appUser.netlifyUser.user_metadata?.full_name as string | undefined) ??
+      (appUser.netlifyUser.user_metadata?.name as string | undefined) ??
       null;
     const parts = fullName ? fullName.split(" ").map((p) => p.trim()).filter(Boolean) : [];
     const firstName = parts[0] ?? null;
     const surname = parts.length > 1 ? parts.slice(1).join(" ") : null;
-
-    const appUser = await getOrCreateAppUser(netlifyUser);
 
     const pendingRows = await sql`
       SELECT id FROM chefs
@@ -80,7 +77,7 @@ export const handler: Handler = async (event, context) => {
         bio, headshot_url, cv_url, references_text, food_genres, approval_status
       )
       VALUES (
-        ${appUser.id}, ${firstName}, ${surname}, ${netlifyUser.email ?? null}, ${mobilePhone || null},
+        ${appUser.id}, ${firstName}, ${surname}, ${appUser.netlifyUser.email ?? null}, ${mobilePhone || null},
         ${bio || null}, ${headshotUrl || null}, ${cvUrl}, ${references}, ${foodGenres as unknown as string[]}, 'pending'
       )
       ON CONFLICT (member_id) DO UPDATE SET
@@ -102,7 +99,7 @@ export const handler: Handler = async (event, context) => {
         "A member applied to cook.",
         "",
         `Member id (app): ${appUser.id}`,
-        `Email: ${netlifyUser.email ?? "unknown"}`,
+        `Email: ${appUser.netlifyUser.email ?? "unknown"}`,
         `Food genres: ${foodGenres.join(", ") || "(none)"}`,
         `CV: ${cvUrl}`,
         "",
@@ -113,6 +110,7 @@ export const handler: Handler = async (event, context) => {
     return { statusCode: 200, headers: jsonHeaders, body: JSON.stringify({ ok: true }) };
   } catch (e) {
     console.error("chef-apply", e);
-    return { statusCode: 500, headers: jsonHeaders, body: JSON.stringify({ error: "Server error" }) };
+    const statusCode = authStatusFromError(e);
+    return { statusCode, headers: jsonHeaders, body: JSON.stringify({ error: publicErrorMessage(e) }) };
   }
 };

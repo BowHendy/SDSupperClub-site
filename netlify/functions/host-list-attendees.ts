@@ -1,5 +1,6 @@
 import type { Handler } from "@netlify/functions";
-import { getNetlifyUser, getOrCreateAppUser } from "./lib/auth";
+import { requireApprovedMember } from "./lib/auth";
+import { authStatusFromError, publicErrorMessage } from "./lib/security";
 import { getApprovedHostForMember, hostOwnsDinner } from "./lib/host";
 import { sql } from "./lib/db";
 
@@ -10,13 +11,9 @@ export const handler: Handler = async (event, context) => {
     return { statusCode: 405, headers: jsonHeaders, body: JSON.stringify({ error: "Method Not Allowed" }) };
   }
 
-  const netlifyUser = getNetlifyUser(context);
-  if (!netlifyUser) {
-    return { statusCode: 401, headers: jsonHeaders, body: JSON.stringify({ error: "Unauthorized" }) };
-  }
 
   try {
-    const appUser = await getOrCreateAppUser(netlifyUser);
+    const appUser = await requireApprovedMember(context);
     const host = await getApprovedHostForMember(appUser.id);
     if (!host) {
       return { statusCode: 403, headers: jsonHeaders, body: JSON.stringify({ error: "Not an approved host" }) };
@@ -60,6 +57,7 @@ export const handler: Handler = async (event, context) => {
     };
   } catch (e) {
     console.error("host-list-attendees", e);
-    return { statusCode: 500, headers: jsonHeaders, body: JSON.stringify({ error: "Server error" }) };
+    const statusCode = authStatusFromError(e);
+    return { statusCode, headers: jsonHeaders, body: JSON.stringify({ error: publicErrorMessage(e) }) };
   }
 };

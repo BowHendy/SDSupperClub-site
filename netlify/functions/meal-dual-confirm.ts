@@ -1,5 +1,6 @@
 import type { Handler } from "@netlify/functions";
-import { getNetlifyUser, getOrCreateAppUser } from "./lib/auth";
+import { requireApprovedMember } from "./lib/auth";
+import { authStatusFromError, publicErrorMessage } from "./lib/security";
 import { getApprovedHostForMember, hostOwnsDinner } from "./lib/host";
 import { getApprovedChefForMember } from "./lib/chef";
 import { daysUntilDisplayDate } from "./lib/meal";
@@ -12,10 +13,6 @@ export const handler: Handler = async (event, context) => {
     return { statusCode: 405, headers: jsonHeaders, body: JSON.stringify({ error: "Method Not Allowed" }) };
   }
 
-  const netlifyUser = getNetlifyUser(context);
-  if (!netlifyUser) {
-    return { statusCode: 401, headers: jsonHeaders, body: JSON.stringify({ error: "Unauthorized" }) };
-  }
 
   try {
     const body = JSON.parse(event.body || "{}");
@@ -29,7 +26,7 @@ export const handler: Handler = async (event, context) => {
       };
     }
 
-    const appUser = await getOrCreateAppUser(netlifyUser);
+    const appUser = await requireApprovedMember(context);
     const mealRows = await sql`
       SELECT id, host_id, chef_id, display_date, price_agreed_by_host,
              host_confirmed_at, chef_confirmed_at, status
@@ -103,6 +100,7 @@ export const handler: Handler = async (event, context) => {
     return { statusCode: 200, headers: jsonHeaders, body: JSON.stringify({ ok: true, bothConfirmed: Boolean(u.host_confirmed_at && u.chef_confirmed_at) }) };
   } catch (e) {
     console.error("meal-dual-confirm", e);
-    return { statusCode: 500, headers: jsonHeaders, body: JSON.stringify({ error: "Server error" }) };
+    const statusCode = authStatusFromError(e);
+    return { statusCode, headers: jsonHeaders, body: JSON.stringify({ error: publicErrorMessage(e) }) };
   }
 };

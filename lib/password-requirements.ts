@@ -28,9 +28,9 @@ const WEAK_PATTERNS = [
 ];
 
 const REQUIREMENT_DEFS = [
-  { id: "length", label: "Use 8+ characters." },
+  { id: "length", label: "Use 12+ characters." },
   { id: "number", label: "Include at least one number." },
-  { id: "special", label: "Include at least one special character (like !, @, #, or ?)." },
+  { id: "special", label: "Include at least one special character (punctuation)." },
   {
     id: "weak",
     label: 'Do not use personal info or obvious patterns (like "1234" or "qwerty").',
@@ -48,11 +48,11 @@ function hasWeakPattern(password: string): boolean {
 function isRequirementMet(id: (typeof REQUIREMENT_DEFS)[number]["id"], password: string): boolean {
   switch (id) {
     case "length":
-      return password.length >= 8;
+      return password.length >= 12;
     case "number":
       return /\d/.test(password);
     case "special":
-      return /[!@#?]/.test(password);
+      return /[^A-Za-z0-9]/.test(password);
     case "weak":
       return password.length > 0 && !hasWeakPattern(password);
     default:

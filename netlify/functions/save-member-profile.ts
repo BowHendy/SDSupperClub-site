@@ -1,5 +1,6 @@
 import type { Handler } from "@netlify/functions";
-import { getNetlifyUser, getOrCreateAppUser } from "./lib/auth";
+import { requireApprovedMember } from "./lib/auth";
+import { authStatusFromError, publicErrorMessage } from "./lib/security";
 import { sql } from "./lib/db";
 
 const jsonHeaders = { "Content-Type": "application/json" };
@@ -9,10 +10,6 @@ export const handler: Handler = async (event, context) => {
     return { statusCode: 405, headers: jsonHeaders, body: JSON.stringify({ error: "Method Not Allowed" }) };
   }
 
-  const netlifyUser = getNetlifyUser(context);
-  if (!netlifyUser) {
-    return { statusCode: 401, headers: jsonHeaders, body: JSON.stringify({ error: "Unauthorized" }) };
-  }
 
   try {
     const body = JSON.parse(event.body || "{}");
@@ -30,7 +27,7 @@ export const handler: Handler = async (event, context) => {
       return { statusCode: 400, headers: jsonHeaders, body: JSON.stringify({ error: "Incomplete profile", missing }) };
     }
 
-    const appUser = await getOrCreateAppUser(netlifyUser);
+    const appUser = await requireApprovedMember(context);
 
     await sql`
       UPDATE members
@@ -40,13 +37,14 @@ export const handler: Handler = async (event, context) => {
           zip = ${zip},
           allergies = ${allergies || null},
           profile_complete = true,
-          email = ${netlifyUser.email ?? null}
+          email = ${appUser.netlifyUser.email ?? null}
       WHERE id = ${appUser.id}
     `;
 
     return { statusCode: 200, headers: jsonHeaders, body: JSON.stringify({ ok: true }) };
   } catch (e) {
     console.error("save-member-profile", e);
-    return { statusCode: 500, headers: jsonHeaders, body: JSON.stringify({ error: "Server error" }) };
+    const statusCode = authStatusFromError(e);
+    return { statusCode, headers: jsonHeaders, body: JSON.stringify({ error: publicErrorMessage(e) }) };
   }
 };

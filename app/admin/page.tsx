@@ -230,6 +230,12 @@ export default function AdminPage() {
           router.replace("/login/");
           return;
         }
+        const meRes = await fetchAuthed(netlifyFunctionUrl("admin-me"));
+        const meJson = (await meRes.json()) as { isAdmin?: boolean };
+        if (!meRes.ok || !meJson.isAdmin) {
+          router.replace("/member/");
+          return;
+        }
         offAuth = subscribeAuthChange((signedIn) => {
           if (!signedIn) router.replace("/login/");
         });

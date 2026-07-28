@@ -45,7 +45,7 @@ export const handler: Handler = async (event) => {
     return {
       statusCode: 500,
       headers: jsonHeaders,
-      body: JSON.stringify({ error: String(e) }),
+      body: JSON.stringify({ error: "Server error" }),
     };
   }
 };

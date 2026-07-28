@@ -1,5 +1,6 @@
 import type { Handler } from "@netlify/functions";
-import { getNetlifyUser, getOrCreateAppUser } from "./lib/auth";
+import { requireApprovedMember } from "./lib/auth";
+import { authStatusFromError, publicErrorMessage } from "./lib/security";
 import { isAdmin } from "./lib/admin";
 import { sql } from "./lib/db";
 
@@ -20,16 +21,15 @@ export const handler: Handler = async (event, context) => {
     return { statusCode: 405, headers: jsonHeaders, body: JSON.stringify({ error: "Method Not Allowed" }) };
   }
 
-  const netlifyUser = getNetlifyUser(context);
-  if (!netlifyUser) {
-    return { statusCode: 401, headers: jsonHeaders, body: JSON.stringify({ error: "Unauthorized" }) };
-  }
 
   try {
-    const appUser = await getOrCreateAppUser(netlifyUser);
+    const appUser = await requireApprovedMember(context);
 
     const meals = await sql`
-      SELECT * FROM dinners
+      SELECT
+        id, title, month, year, neighborhood, chef_name, status, max_seats,
+        display_date, meal_price_per_guest, food_genre, created_at, zip
+      FROM dinners
       WHERE is_visible = true AND status IN ('live', 'upcoming', 'full')
     `;
 
@@ -41,7 +41,8 @@ export const handler: Handler = async (event, context) => {
     if (meal) {
       const mealId = meal.id as string;
       const attRows = await sql`
-        SELECT * FROM dinner_guests
+        SELECT id, status, dinner_id, member_id, created_at
+        FROM dinner_guests
         WHERE member_id = ${appUser.id} AND dinner_id = ${mealId}
         LIMIT 1
       `;
@@ -106,6 +107,7 @@ export const handler: Handler = async (event, context) => {
     };
   } catch (e) {
     console.error("get-member-summary", e);
-    return { statusCode: 500, headers: jsonHeaders, body: JSON.stringify({ error: String(e) }) };
+    const statusCode = authStatusFromError(e);
+    return { statusCode, headers: jsonHeaders, body: JSON.stringify({ error: publicErrorMessage(e) }) };
   }
 };

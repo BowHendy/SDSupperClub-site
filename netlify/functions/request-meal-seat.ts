@@ -61,6 +61,28 @@ export const handler: Handler = async (event, context) => {
       return { statusCode: 400, headers: jsonHeaders, body: JSON.stringify({ error: "Invalid dinnerId" }) };
     }
 
+    const ip = clientIpFromEvent(event);
+    const ipLimit = await consumeRateLimit({
+      bucket: `meal-seat:ip:${ip}`,
+      max: RATE_IP_MAX,
+      windowSeconds: RATE_IP_WINDOW_SEC,
+    });
+    if (!ipLimit.allowed) return tooManyRequests();
+
+    const emailLimitEarly = await consumeRateLimit({
+      bucket: `meal-seat:email:${email}`,
+      max: RATE_EMAIL_MAX,
+      windowSeconds: RATE_EMAIL_WINDOW_SEC,
+    });
+    if (!emailLimitEarly.allowed) return tooManyRequests();
+
+    // Global bucket is monitoring-only so one attacker cannot lock the whole site.
+    await consumeRateLimit({
+      bucket: "meal-seat:global",
+      max: RATE_GLOBAL_MAX,
+      windowSeconds: RATE_GLOBAL_WINDOW_SEC,
+    });
+
     const mealRows = await sql`
       SELECT id, status, is_visible, max_seats FROM dinners WHERE id = ${dinnerId} LIMIT 1
     `;
@@ -107,34 +129,12 @@ export const handler: Handler = async (event, context) => {
       };
     }
 
-    const ip = clientIpFromEvent(event);
-    const ipLimit = await consumeRateLimit({
-      bucket: `meal-seat:ip:${ip}`,
-      max: RATE_IP_MAX,
-      windowSeconds: RATE_IP_WINDOW_SEC,
-    });
-    if (!ipLimit.allowed) return tooManyRequests();
-
-    const globalLimit = await consumeRateLimit({
-      bucket: "meal-seat:global",
-      max: RATE_GLOBAL_MAX,
-      windowSeconds: RATE_GLOBAL_WINDOW_SEC,
-    });
-    if (!globalLimit.allowed) return tooManyRequests();
-
     const dinnerLimit = await consumeRateLimit({
       bucket: `meal-seat:dinner:${dinnerId}`,
       max: RATE_DINNER_MAX,
       windowSeconds: RATE_DINNER_WINDOW_SEC,
     });
     if (!dinnerLimit.allowed) return tooManyRequests();
-
-    const emailLimit = await consumeRateLimit({
-      bucket: `meal-seat:email:${email}`,
-      max: RATE_EMAIL_MAX,
-      windowSeconds: RATE_EMAIL_WINDOW_SEC,
-    });
-    if (!emailLimit.allowed) return tooManyRequests();
 
     try {
       await sql`

@@ -33,8 +33,8 @@ export function clientIpFromEvent(event: {
 }
 
 /**
- * Increment a named bucket. Returns allowed=false when the count would exceed max
- * within the rolling windowSeconds window (resets after the window elapses).
+ * Increment a named bucket atomically. Returns allowed=false when the count
+ * would exceed max within the rolling windowSeconds window.
  */
 export async function consumeRateLimit(params: {
   bucket: string;
@@ -45,40 +45,26 @@ export async function consumeRateLimit(params: {
   const { bucket, max, windowSeconds } = params;
 
   const rows = await sql`
-    SELECT hit_count, window_start FROM public.rate_limit_buckets WHERE bucket = ${bucket} LIMIT 1
+    INSERT INTO public.rate_limit_buckets (bucket, hit_count, window_start)
+    VALUES (${bucket}, 1, now())
+    ON CONFLICT (bucket) DO UPDATE
+      SET
+        hit_count = CASE
+          WHEN public.rate_limit_buckets.window_start <= now() - (${windowSeconds} * interval '1 second')
+            THEN 1
+          ELSE public.rate_limit_buckets.hit_count + 1
+        END,
+        window_start = CASE
+          WHEN public.rate_limit_buckets.window_start <= now() - (${windowSeconds} * interval '1 second')
+            THEN now()
+          ELSE public.rate_limit_buckets.window_start
+        END
+    RETURNING hit_count
   `;
-  const row = rows[0] as { hit_count: number; window_start: string } | undefined;
-  const now = Date.now();
 
-  if (!row) {
-    await sql`
-      INSERT INTO public.rate_limit_buckets (bucket, hit_count, window_start)
-      VALUES (${bucket}, 1, now())
-      ON CONFLICT (bucket) DO UPDATE SET hit_count = 1, window_start = now()
-    `;
-    return { allowed: true, remaining: Math.max(0, max - 1) };
-  }
-
-  const windowStart = new Date(row.window_start).getTime();
-  const elapsedSec = (now - windowStart) / 1000;
-
-  if (elapsedSec >= windowSeconds) {
-    await sql`
-      UPDATE public.rate_limit_buckets
-      SET hit_count = 1, window_start = now()
-      WHERE bucket = ${bucket}
-    `;
-    return { allowed: true, remaining: Math.max(0, max - 1) };
-  }
-
-  if (row.hit_count >= max) {
+  const hitCount = Number((rows[0] as { hit_count: number } | undefined)?.hit_count ?? 1);
+  if (hitCount > max) {
     return { allowed: false, remaining: 0 };
   }
-
-  await sql`
-    UPDATE public.rate_limit_buckets
-    SET hit_count = hit_count + 1
-    WHERE bucket = ${bucket}
-  `;
-  return { allowed: true, remaining: Math.max(0, max - row.hit_count - 1) };
+  return { allowed: true, remaining: Math.max(0, max - hitCount) };
 }

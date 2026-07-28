@@ -12,12 +12,27 @@ export async function isSignedIn(): Promise<boolean> {
   }
 }
 
-/** End the current session (clears @netlify/identity cookies). */
+function clearLocalIdentityState(): void {
+  if (typeof document === "undefined") return;
+  const expire = "Thu, 01 Jan 1970 00:00:00 GMT";
+  const base = `path=/; secure; samesite=lax; expires=${expire}`;
+  document.cookie = `nf_jwt=; ${base}`;
+  document.cookie = `nf_refresh=; ${base}`;
+  try {
+    window.localStorage.removeItem("gotrue.user");
+  } catch {
+    /* ignore */
+  }
+}
+
+/** End the current session and always clear local Identity cookies/storage. */
 export async function signOut(): Promise<void> {
   try {
     await identityLogout();
   } catch {
-    /* session may already be cleared */
+    /* session may already be cleared remotely */
+  } finally {
+    clearLocalIdentityState();
   }
 }
 

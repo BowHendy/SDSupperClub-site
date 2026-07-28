@@ -1,5 +1,6 @@
 import type { Handler } from "@netlify/functions";
-import { getNetlifyUser, getOrCreateAppUser } from "./lib/auth";
+import { requireApprovedMember } from "./lib/auth";
+import { authStatusFromError, publicErrorMessage } from "./lib/security";
 import { sql } from "./lib/db";
 import { normalizeUsZip } from "./lib/geocode";
 
@@ -39,10 +40,6 @@ export const handler: Handler = async (event, context) => {
     return { statusCode: 405, headers: jsonHeaders, body: JSON.stringify({ error: "Method Not Allowed" }) };
   }
 
-  const netlifyUser = getNetlifyUser(context);
-  if (!netlifyUser) {
-    return { statusCode: 401, headers: jsonHeaders, body: JSON.stringify({ error: "Unauthorized" }) };
-  }
 
   try {
     const body = JSON.parse(event.body || "{}");
@@ -85,9 +82,11 @@ export const handler: Handler = async (event, context) => {
       };
     }
 
+    const appUser = await requireApprovedMember(context);
+
     const fullName =
-      (netlifyUser.user_metadata?.full_name as string | undefined) ??
-      (netlifyUser.user_metadata?.name as string | undefined) ??
+      (appUser.netlifyUser.user_metadata?.full_name as string | undefined) ??
+      (appUser.netlifyUser.user_metadata?.name as string | undefined) ??
       null;
     const parts = fullName
       ? fullName
@@ -97,8 +96,6 @@ export const handler: Handler = async (event, context) => {
       : [];
     const firstName = parts[0] ?? null;
     const surname = parts.length > 1 ? parts.slice(1).join(" ") : null;
-
-    const appUser = await getOrCreateAppUser(netlifyUser);
 
     const pendingRows = await sql`
       SELECT id FROM hosts
@@ -136,7 +133,7 @@ export const handler: Handler = async (event, context) => {
         ${appUser.id},
         ${firstName},
         ${surname},
-        ${netlifyUser.email ?? null},
+        ${appUser.netlifyUser.email ?? null},
         ${mobilePhone || null},
         ${address},
         ${zip},
@@ -172,8 +169,8 @@ export const handler: Handler = async (event, context) => {
         "A member requested to host.",
         "",
         `Member id (app): ${appUser.id}`,
-        `Netlify id: ${netlifyUser.sub}`,
-        `Email: ${netlifyUser.email ?? "unknown"}`,
+        `Netlify id: ${appUser.netlifyUser.sub}`,
+        `Email: ${appUser.netlifyUser.email ?? "unknown"}`,
         "",
         `Address:\n${address}`,
         `ZIP: ${zip}`,
@@ -188,6 +185,7 @@ export const handler: Handler = async (event, context) => {
     return { statusCode: 200, headers: jsonHeaders, body: JSON.stringify({ ok: true }) };
   } catch (e) {
     console.error("request-host", e);
-    return { statusCode: 500, headers: jsonHeaders, body: JSON.stringify({ error: String(e) }) };
+    const statusCode = authStatusFromError(e);
+    return { statusCode, headers: jsonHeaders, body: JSON.stringify({ error: publicErrorMessage(e) }) };
   }
 };

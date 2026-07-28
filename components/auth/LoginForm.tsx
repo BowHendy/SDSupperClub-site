@@ -55,10 +55,10 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
     setRecoveryBusy(true);
     try {
       await requestPasswordRecovery(trimmedEmail);
-      setRecoverySent(true);
-    } catch (e) {
-      setError(formatAuthError(e));
+    } catch {
+      /* Always show the same message to avoid account enumeration. */
     } finally {
+      setRecoverySent(true);
       setRecoveryBusy(false);
     }
   };
