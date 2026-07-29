@@ -3,7 +3,7 @@
 > **Status:** Phases 1–4 implemented (2026-06-08) — meal-first onboarding, role workspaces, meal lifecycle, payment stubs, ops cron + admin tabs
 > **Last updated:** 2026-06-08  
 > **Miro board:** [Supper Collective flows](https://miro.com/app/board/uXjVHI1dVnI=/)  
-> **Related:** [`docs/sitemap.md`](sitemap.md), [`netlify/db/schema.sql`](../netlify/db/schema.sql)
+> **Related:** [`docs/roadmap.md`](roadmap.md) (execution queue), [`docs/sitemap.md`](sitemap.md), [`netlify/db/schema.sql`](../netlify/db/schema.sql)
 
 Use this document as the single source of truth for actor roles, meal lifecycle, payments, and UI organization. **Q&A complete** — all edge cases and general decisions locked (2026-06-08).
 
