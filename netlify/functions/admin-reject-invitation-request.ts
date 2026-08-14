@@ -56,24 +56,35 @@ export const handler: Handler = async (event, context) => {
       `;
     }
 
-    // #region agent log
-    stage = "build_email";
-    // #endregion
-    const rejection = buildRejectionEmail(req.name, note);
-    // #region agent log
-    stage = "send_email";
-    // #endregion
-    await sendEmail({
-      to: req.email,
-      subject: rejection.subject,
-      text: rejection.text,
-      html: rejection.html,
-    });
+    // Don’t fail rejection if the notification email fails; status update is the main action.
+    let emailSent = false;
+    try {
+      // #region agent log
+      stage = "build_email";
+      // #endregion
+      const rejection = buildRejectionEmail(req.name, note);
+      // #region agent log
+      stage = "send_email";
+      // #endregion
+      await sendEmail({
+        to: req.email,
+        subject: rejection.subject,
+        text: rejection.text,
+        html: rejection.html,
+      });
+      emailSent = true;
+    } catch (e) {
+      // #region agent log
+      const emailMsg = e instanceof Error ? e.message : String(e);
+      console.error("admin-reject-invitation-request: email failed", { stage, msg: emailMsg });
+      // #endregion
+    }
 
     // #region agent log
     stage = "done";
+    console.error("admin-reject-invitation-request debug", { stage, emailSent, statusCode: 200 });
     // #endregion
-    return { statusCode: 200, headers: jsonHeaders, body: JSON.stringify({ ok: true }) };
+    return { statusCode: 200, headers: jsonHeaders, body: JSON.stringify({ ok: true, emailSent }) };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     const statusCode = msg === "Unauthorized" ? 401 : msg === "Forbidden" ? 403 : 500;

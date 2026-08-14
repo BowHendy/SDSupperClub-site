@@ -304,7 +304,7 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "b7a4ad" },
         body: JSON.stringify({
           sessionId: "b7a4ad",
-          runId: "reject-repro",
+          runId: "post-fix",
           hypothesisId: json.debugStage === "send_email" ? "A" : json.debugStage === "update" ? "B" : "C",
           location: "app/admin/page.tsx:reject",
           message: "admin reject invitation response",
@@ -314,6 +314,7 @@ export default function AdminPage() {
             error: json.error ?? null,
             debugDetail: json.debugDetail ?? null,
             debugStage: json.debugStage ?? null,
+            emailSent: (json as { emailSent?: boolean }).emailSent ?? null,
             requestIdPrefix: requestId.slice(0, 8),
             hasNote: Boolean((rejectNote[requestId] ?? "").trim()),
           },
