@@ -11,8 +11,17 @@ export const handler: Handler = async (event, context) => {
     return { statusCode: 405, headers: jsonHeaders, body: JSON.stringify({ error: "Method Not Allowed" }) };
   }
 
+  // #region agent log
+  let stage = "start";
+  // #endregion
   try {
+    // #region agent log
+    stage = "auth";
+    // #endregion
     const admin = await requireAdmin(context);
+    // #region agent log
+    stage = "parse";
+    // #endregion
     const body = JSON.parse(event.body || "{}") as { requestId?: string; note?: string };
     const requestId = body.requestId;
     const note = (body.note ?? "").trim();
@@ -20,6 +29,9 @@ export const handler: Handler = async (event, context) => {
       return { statusCode: 400, headers: jsonHeaders, body: JSON.stringify({ error: "requestId required" }) };
     }
 
+    // #region agent log
+    stage = "select";
+    // #endregion
     const rows = await sql`
       SELECT id, name, email, status
       FROM invitation_requests
@@ -32,6 +44,9 @@ export const handler: Handler = async (event, context) => {
     }
 
     if (req.status !== "rejected") {
+      // #region agent log
+      stage = "update";
+      // #endregion
       await sql`
         UPDATE invitation_requests
         SET status = 'rejected',
@@ -41,7 +56,13 @@ export const handler: Handler = async (event, context) => {
       `;
     }
 
+    // #region agent log
+    stage = "build_email";
+    // #endregion
     const rejection = buildRejectionEmail(req.name, note);
+    // #region agent log
+    stage = "send_email";
+    // #endregion
     await sendEmail({
       to: req.email,
       subject: rejection.subject,
@@ -49,11 +70,26 @@ export const handler: Handler = async (event, context) => {
       html: rejection.html,
     });
 
+    // #region agent log
+    stage = "done";
+    // #endregion
     return { statusCode: 200, headers: jsonHeaders, body: JSON.stringify({ ok: true }) };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     const statusCode = msg === "Unauthorized" ? 401 : msg === "Forbidden" ? 403 : 500;
-    return { statusCode, headers: jsonHeaders, body: JSON.stringify({ error: statusCode === 500 ? "Server error" : msg }) };
+    // #region agent log
+    console.error("admin-reject-invitation-request debug", { stage, msg, statusCode });
+    // #endregion
+    return {
+      statusCode,
+      headers: jsonHeaders,
+      body: JSON.stringify({
+        error: statusCode === 500 ? "Server error" : msg,
+        // Temporary debug fields for client-side capture (session b7a4ad)
+        debugDetail: msg,
+        debugStage: stage,
+      }),
+    };
   }
 };
 

@@ -292,11 +292,54 @@ export default function AdminPage() {
         method: "POST",
         body: JSON.stringify({ requestId, note: rejectNote[requestId] ?? "" }),
       });
-      const json = (await res.json()) as { ok?: boolean; error?: string };
+      const json = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        debugDetail?: string;
+        debugStage?: string;
+      };
+      // #region agent log
+      fetch("http://127.0.0.1:7791/ingest/9edce051-a32e-42af-9f1a-0a04a0d1bc57", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "b7a4ad" },
+        body: JSON.stringify({
+          sessionId: "b7a4ad",
+          runId: "reject-repro",
+          hypothesisId: json.debugStage === "send_email" ? "A" : json.debugStage === "update" ? "B" : "C",
+          location: "app/admin/page.tsx:reject",
+          message: "admin reject invitation response",
+          data: {
+            status: res.status,
+            ok: res.ok,
+            error: json.error ?? null,
+            debugDetail: json.debugDetail ?? null,
+            debugStage: json.debugStage ?? null,
+            requestIdPrefix: requestId.slice(0, 8),
+            hasNote: Boolean((rejectNote[requestId] ?? "").trim()),
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       if (!res.ok) throw new Error(json.error ?? "Rejection failed");
       setRejectNote((prev) => ({ ...prev, [requestId]: "" }));
       await loadRequests();
     } catch (e) {
+      // #region agent log
+      fetch("http://127.0.0.1:7791/ingest/9edce051-a32e-42af-9f1a-0a04a0d1bc57", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "b7a4ad" },
+        body: JSON.stringify({
+          sessionId: "b7a4ad",
+          runId: "reject-repro",
+          hypothesisId: "D",
+          location: "app/admin/page.tsx:reject-catch",
+          message: "admin reject invitation client catch",
+          data: { message: e instanceof Error ? e.message : String(e) },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       setActionError(e instanceof Error ? e.message : "Rejection failed.");
     } finally {
       setBusyId(null);
